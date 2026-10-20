@@ -97,6 +97,17 @@ export interface Stats {
   porPadrao: Partial<Record<PatternId, number>>;
 }
 
+/** Rodada em andamento (para retomar ao reabrir). */
+export interface SavedRound {
+  bet: number;
+  jackpot: number; // valor do acumulado em jogo
+  plan: DrawPlan;
+  mainIdx: number;
+  extrasUsed: number;
+  cards: Card[];
+  active: boolean[];
+}
+
 export interface SaveData {
   version: 1;
   credits: number;
@@ -108,4 +119,5 @@ export interface SaveData {
   director: DirectorState;
   stats: Stats;
   lastDailyBonus: string; // "2026-10-20"
+  round?: SavedRound | null;
 }
