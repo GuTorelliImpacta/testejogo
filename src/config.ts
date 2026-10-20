@@ -15,8 +15,8 @@ export const BET_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const DEFAULT_BET = 5;
 export const DEFAULT_CARDS = 4;
 
-/** Intervalo entre bolas no Turbo (ms). */
-export const TURBO_MS = 120;
+/** Turbo: as 30 bolas saem de uma vez; pausa (ms) depois do preenchimento, antes da oferta de extra/resultado. */
+export const TURBO_MS = 500;
 
 export const SPEED_MS = { lenta: 2000, normal: 1400, rapida: 900 } as const;
 
