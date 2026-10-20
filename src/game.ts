@@ -213,6 +213,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     st.rodadasPorDia[dk] = (st.rodadasPorDia[dk] ?? 0) + 1;
     for (const r of sum.results) if (r.pattern) st.porPadrao[r.pattern] = (st.porPadrao[r.pattern] ?? 0) + 1;
     data.turboRounds++;
+    // grava já (rodada encerrada + prêmio creditado): recarregar agora não pode pagar duas vezes
+    data.round = null;
+    saveNow(data);
     trackPlayTime();
     const hadBingo = sum.results.some((r) => r.pattern === 'bingo');
     data.director = afterRound(data.director, now(), hadBingo);

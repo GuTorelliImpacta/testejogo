@@ -7,7 +7,7 @@ import type { SaveData } from '../../../src/types';
 
 const SCEN = [
   'free-extra', 'paid-extra', 'turbo-mid', 'turbo-off-mid', 'resume-mid', 'resume-offer', 'mail-daily', 'mail-bonus', 'admin-set',
-  'gift-auto', 'splash-wipe', 'limits', 'bingo-jackpot-share', 'auto-mail', 'speech-hang',
+  'gift-auto', 'splash-wipe', 'midnight', 'admin-mid', 'limits', 'bingo-jackpot-share', 'auto-mail', 'speech-hang',
 ];
 
 if (!process.argv[2]) {
@@ -343,6 +343,41 @@ async function until(pred: () => boolean, ms = 30000, step = 10): Promise<boolea
     chk('rodada salva sobrevive a updateSettings antes de ENTRAR (BUG se falhar: aposta já debitada é perdida)', saved().round !== null, `round=${saved().round ? 'ok' : 'null'}`);
     g.enter();
     chk('ENTRAR retoma a rodada', g.getView().phase === 'drawing', g.getView().phase);
+  }
+
+  if (name === 'midnight') {
+    const s0 = baseSave(1);
+    s0.settings.turbo = true;
+    seed(s0);
+    const g = mk();
+    g.enter();
+    chk('hoje: sem correio (já pego)', g.getView().mail === null);
+    clock += 25 * 3600 * 1000; // o tablet fica ligado na tomada e passa da meia-noite
+    g.play();
+    for (let i = 0; i < 200 && !(g.getView().phase === 'idle' && g.getView().drawn.length > 0); i++) {
+      if (g.getView().phase === 'extraOffer') g.finishExtra();
+      if (g.getView().phase === 'celebrating') g.continueCelebration();
+      await wait(50);
+    }
+    chk('MENOR: sessão aberta atravessando a meia-noite deve receber o correio diário do novo dia (hoje só ao reabrir)', g.getView().mail?.kind === 'daily', JSON.stringify(g.getView().mail));
+  }
+
+  if (name === 'admin-mid') {
+    // PIN acessível durante o sorteio: importar/zerar no meio da rodada
+    const s0 = blankRound({ turbo: false, mainIdx: 25, credits: 777 });
+    s0.settings.speed = 'rapida';
+    seed(s0);
+    const g = mk();
+    g.enter();
+    g.admin.unlock('1958');
+    const exp = JSON.parse(g.admin.exportJson());
+    exp.credits = 5000;
+    const ok = g.admin.importJson(JSON.stringify(exp));
+    chk('importJson aceito durante o sorteio (sem trava de fase)', ok === true);
+    await until(() => g.getView().phase === 'idle', 20000);
+    chk('rodada termina e saldo = importado (5000), sem crash', g.getView().credits === 5000 && saved().round === null, `credits=${g.getView().credits}`);
+    g.admin.resetCredits();
+    chk('resetCredits durante o sorteio é aceito (MENOR: sem trava de fase)', true);
   }
 
   if (name === 'limits') {

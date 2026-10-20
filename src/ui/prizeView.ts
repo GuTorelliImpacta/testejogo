@@ -55,7 +55,7 @@ export function createPrizeTable(onOpen: () => void): PrizeView {
           const lbl = share < 1 ? U.jackpotPct(share) : T.jackpot;
           const sh = share < 1 ? U.jackpotPctShort(share) : U.jackpotShort;
           setRowName(r, lbl, sh);
-          setText(r.pv, fmt(v.jackpot * share));
+          setText(r.pv, fmt(Math.floor(v.jackpot * share)));
           r.el.classList.add('jk');
         } else {
           const p = v.prizeTable.find((x) => x.pattern === r.key);

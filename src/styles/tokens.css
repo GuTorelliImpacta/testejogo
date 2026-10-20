@@ -46,3 +46,8 @@
 }
 .altina.ts-grande { --ts: 1.12; --tsb: 1.06; }
 .altina.ts-muito { --ts: 1.25; --tsb: 1.1; }
+
+/* Celular: texto grande não pode estourar as cartelas */
+@media (max-width: 480px) {
+  .altina.ts-grande, .altina.ts-muito { --ts: 1; --tsb: 1; }
+}

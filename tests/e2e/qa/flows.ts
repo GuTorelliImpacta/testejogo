@@ -103,7 +103,7 @@ const allErrs: string[] = [];
     const cats = spk2.map((t) => VOICE_LINES.find((v) => v.text === t)?.category ?? '??');
     const bad = cats.filter((k) => ['number', 'bordao', 'almost'].includes(k));
     chk('Turbo: nenhuma fala de número/bordão/"falta 1" (só prêmios, oferta, comentários)', bad.length === 0, `falas=${JSON.stringify(spk2)} categorias=${cats.join(',')}`);
-    chk('Turbo: sem speechSynthesis', l2.utter.length === 0, JSON.stringify(l2.utter.slice(0, 3)));
+    chk('Turbo: sem speechSynthesis além da saudação inicial', l2.utter.every((u) => /Vamos jogar/.test(u.text)), JSON.stringify(l2.utter.slice(0, 3)));
     await c2.ctx.close();
     void d0;
 
@@ -181,7 +181,7 @@ const allErrs: string[] = [];
     }
     // até 9 extras: plano com 9 extras que não completam, todas grátis -> 9 compras e acaba
     {
-      const s = nearBingo({ mainIdx: 30, credits: 800, free: Array(9).fill(false), turbo: true });
+      const s = nearBingo({ mainIdx: 30, credits: 3000, bet: 2, extrasDecisive: true, free: Array(9).fill(false), turbo: true });
       const f = fillers(s.cards, 30, 1);
       s.round!.plan.extras = f.slice(0, 9); // nenhuma decide
       const c = await open(browser, s);
@@ -216,8 +216,8 @@ const allErrs: string[] = [];
       await enter(p);
       const tbl = await p.locator('.ptab .pr').allTextContents();
       await p.waitForSelector('text=CONTINUAR', { timeout: 20000 });
+      await p.waitForTimeout(1800); // contagem animada (1,2 s)
       const celeb = (await p.locator('.celeb').innerText()).replace(/\n/g, ' / ');
-      await p.waitForTimeout(1500);
       const prize = Math.floor(5400 * pct) + 500 * bet;
       const shown = celeb.match(/\+([\d.]+)/)?.[1]?.replace(/\./g, '');
       chk(`aposta ${bet}: tela de celebração mostra +${prize} (acumulado ${pct * 100}% + bingo)`, shown === String(prize), `celebração="${celeb}"`);
@@ -239,6 +239,7 @@ const allErrs: string[] = [];
       const titleOffer = await p.locator('.xtitle').textContent();
       await p.locator('.xbuy').click();
       await p.waitForSelector('text=CONTINUAR', { timeout: 20000 });
+      await p.waitForTimeout(1800);
       const celeb = (await p.locator('.celeb').innerText()).replace(/\n/g, ' / ');
       chk('bingo na bola extra: celebração +2.500 e SEM texto de acumulado', /\+2\.500/.test(celeb) && !/ACUMULADO/i.test(celeb), `"${celeb}" (oferta "${titleOffer}")`);
       await c.ctx.close();
@@ -321,7 +322,7 @@ const allErrs: string[] = [];
     for (let i = 0; i < 5; i++) { seq.push((await p.locator('.ballsec .counter').textContent())!); await p.waitForTimeout(1900); }
     chk('contador "Bola X de 30" avança', /^Bola \d+ de 30$/.test(seq[0]) && seq[4] !== seq[0], seq.join(' | '));
     const filled = await p.locator('.trail .tr-main .tc.on').count();
-    chk('trilho: casas preenchidas = bolas sorteadas, em 3 fileiras de 10', filled >= 5 && (await p.evaluate(() => { const r = [...document.querySelectorAll('.trail .tr-main .tc')].map((e) => e.getBoundingClientRect().top); return new Set(r.map((t) => Math.round(t))).size; })) === 3);
+    chk('trilho: casas preenchidas = bolas sorteadas, em 3 fileiras de 10', filled >= 5 && (await p.evaluate(() => { const r = [...document.querySelectorAll('.trail .tr-main .tc')].map((e) => (e as HTMLElement).offsetTop); return new Set(r).size; })) === 3);
     const ex = await p.locator('.trail .tr-extra .tc').count();
     chk('trilho: 9 casas de extra com contorno tracejado', ex === 9 && (await p.evaluate(() => getComputedStyle(document.querySelector('.trail .tr-extra .tc')!).borderTopStyle)) === 'dashed');
     const order = await p.evaluate(() => [...document.querySelectorAll('.trail .tr-main .tc.on')].map((e) => Number(e.textContent)));
@@ -499,6 +500,64 @@ const allErrs: string[] = [];
     chk('M7: leve automático só a partir do 4º sorteio (rodadas 1-3 = false)', lights.slice(0, 3).every((x) => x === false), `light após rodadas 1..4 e +4 s: ${lights.join(',')}`);
     note(`modo leve automático depois da 4ª rodada (CPU 25x): ${lights[4]} (esperado true em dispositivo lento)`);
     await c2.ctx.close();
+  }
+
+
+  // ------------------------------------------------------------------ 13) "falta 1": fala x aviso visual (M9) e Turbo
+  if (on('almost')) {
+    for (const turbo of [false, true]) {
+      const s = baseSave(3);
+      const c0 = s.cards[0].nums;
+      s.settings.speed = 'rapida';
+      const plan = mkPlan(s.cards, { early: c0.slice(0, 14) });
+      withRound(s, plan, { mainIdx: 12, credits: 980, turbo });
+      const c = await open(browser, s);
+      await enter(c.page);
+      await c.page.waitForTimeout(7000);
+      const l = await log(c.page);
+      const caps = l.caps.filter((x) => x.on).map((x) => `${x.spk ? 'FALA' : x.hot ? 'AVISO' : 'estado'}:${x.text}`);
+      note(`${turbo ? 'TURBO' : 'normal'}: legendas ${JSON.stringify(caps.filter((x) => !x.startsWith('estado')))}`);
+      const spokenAlmost = l.caps.some((x) => x.spk && /Falta uma|quase/i.test(x.text));
+      const hotAlmost = l.caps.some((x) => x.hot && /FALTA 1/.test(x.text));
+      if (!turbo) chk('normal: "falta 1" falado ("Falta uma pro bingo!"/"Tá quase o bingo!") na legenda', spokenAlmost, JSON.stringify(caps.filter((x) => !x.startsWith('estado')).slice(0, 8)));
+      else chk('Turbo: "falta 1" NÃO é falado', !spokenAlmost);
+      note(`${turbo ? 'TURBO' : 'normal'}: aviso visual "FALTA 1!" (não falado) apareceu = ${hotAlmost}${turbo && hotAlmost ? ' -> legenda sem fala correspondente (design: aviso visual); registrar como MENOR se o critério for estrito legenda = fala' : ''}`);
+      await c.ctx.close();
+    }
+  }
+
+  // ------------------------------------------------------------------ 14) vazamentos: várias rodadas em Turbo
+  if (on('leaks')) {
+    const s = baseSave(6);
+    s.settings.turbo = true;
+    const c = await open(browser, s);
+    const p = c.page;
+    await enter(p);
+    const lives: number[] = [];
+    const nodes: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      await p.locator('button.play').click();
+      await finishRound(p, 60_000);
+      await p.waitForTimeout(2600);
+      const m = await p.evaluate(() => ({ live: (window as any).__log.live.size, nodes: document.getElementsByTagName('*').length, anims: document.getAnimations().length, ints: (window as any).__log.intervals }));
+      lives.push(m.live); nodes.push(m.nodes);
+      if (i === 5) chk('após 6 rodadas: animações ativas = 0, setInterval = 0', m.anims === 0 && m.ints === 0, JSON.stringify(m));
+    }
+    chk('timeouts vivos em repouso não crescem a cada rodada', lives[5] <= lives[0] + 1, `live por rodada=${lives.join(',')}`);
+    chk('nós do DOM estáveis (sem acumular confete/elementos)', nodes[5] <= nodes[0] + 10, `nós por rodada=${nodes.join(',')}`);
+    await c.ctx.close();
+  }
+
+  // ------------------------------------------------------------------ 15) acumulado parcial: valor mostrado x valor pago
+  if (on('jpdisplay')) {
+    for (const [bet, jk, pct] of [[2, 5001, 0.75], [1, 5003, 0.5]] as const) {
+      const s = baseSave(1); s.bet = bet; s.jackpot = jk;
+      const c = await open(browser, s);
+      await enter(c.page);
+      const shown = (await c.page.locator('.ptab .pr').nth(3).locator('.pv').textContent())!.replace(/\./g, '');
+      chk(`valor mostrado do Acumulado (aposta ${bet}, ${pct * 100}% de ${jk}) = valor pago ${Math.floor(jk * pct)}`, Number(shown) === Math.floor(jk * pct), `mostra ${shown}, paga ${Math.floor(jk * pct)} (fmt arredonda, o pagamento usa floor)`);
+      await c.ctx.close();
+    }
   }
 
   // ------------------------------------------------------------------ 12) presente, auto

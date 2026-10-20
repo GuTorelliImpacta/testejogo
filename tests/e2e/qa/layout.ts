@@ -1,98 +1,123 @@
-// Auditoria de layout: rolagem, alvos >= 64px, texto >= 20px, em 5 viewports e vários estados.
-import { chromium, type Page } from '@playwright/test';
-import { BASE, EXE, KEY, VIEWPORTS, baseSave, roundNearBingo, today } from './fixtures';
+// QA v2: auditoria de layout no APP REAL (estados forçados via localStorage) em 5 viewports.
+// Mede: rolagem, alvos < 64 px, texto < 20 px, espaçamento < 12 px, diálogos sem rolagem/FECHAR visível, cortes, sobreposição.
+// Uso: npx tsx tests/e2e/qa/layout.ts [estado,estado]   (SHOT=docs/qa salva review2-<estado>-<WxH>.png)
+import { mkdirSync } from 'node:fs';
+import { VIEWPORTS, baseSave, blankRound, fillers, mkPlan, nearBingo, nearDouble, today, withRound } from './fixtures';
+import { audit, launch, open } from './browser';
+import type { Page } from '@playwright/test';
+import type { SaveData } from '../../../src/types';
 
-async function audit(page: Page, label: string) {
-  return page.evaluate((label) => {
-    const out: string[] = [];
-    const vw = innerWidth, vh = innerHeight;
-    const de = document.documentElement;
-    if (de.scrollHeight > vh + 1 || de.scrollWidth > vw + 1) out.push(`ROLAGEM doc ${de.scrollWidth}x${de.scrollHeight} > ${vw}x${vh}`);
-    const vis = (e: Element) => {
-      const r = (e as HTMLElement).getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) return false;
-      for (let p: Element | null = e; p; p = p.parentElement) {
-        const cs = getComputedStyle(p);
-        if (cs.display === 'none' || cs.visibility === 'hidden') return false;
-      }
-      return true;
-    };
-    document.querySelectorAll('button, [role=button], textarea').forEach((b) => {
-      if (!vis(b)) return;
-      const r = (b as HTMLElement).getBoundingClientRect();
-      const name = (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 24);
-      if (r.width < 63.5 || r.height < 63.5) out.push(`ALVO ${Math.round(r.width)}x${Math.round(r.height)} "${name}" .${(b as HTMLElement).className}`);
-      if (r.right > vw + 1 || r.bottom > vh + 1 || r.left < -1 || r.top < -1) out.push(`FORA DA TELA "${name}" ${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);
-    });
-    // espaçamento entre alvos adjacentes (<12px)
-    const top = (e: Element) => { const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, Math.min(vh - 1, Math.max(0, r.top + r.height / 2))); return !!t && (e === t || e.contains(t)); };
-    const btns = [...document.querySelectorAll('button')].filter(vis).filter((b) => !b.closest('.hide')).filter(top);
-    for (let i = 0; i < btns.length; i++)
-      for (let j = i + 1; j < btns.length; j++) {
-        const a = btns[i].getBoundingClientRect(), b = btns[j].getBoundingClientRect();
-        const dx = Math.max(a.left - b.right, b.left - a.right), dy = Math.max(a.top - b.bottom, b.top - a.bottom);
-        const gap = Math.max(dx, dy);
-        if (dx < 200 && dy < 200 && gap >= 0 && gap < 11.5 && (dx < 0 || dy < 0 || true) && Math.min(dx, dy) <= 0)
-          out.push(`ESPAÇO ${Math.round(gap)}px entre "${btns[i].textContent?.trim().slice(0, 12)}" e "${btns[j].textContent?.trim().slice(0, 12)}"`);
-      }
-    const seen = new Set<string>();
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    let n: Node | null;
-    while ((n = walker.nextNode())) {
-      const t = (n.textContent || '').trim();
-      if (!t) continue;
-      const el = n.parentElement!;
-      if (el.closest('.sr, noscript, script, style, pre')) continue;
-      if (!vis(el)) continue;
-      if (getComputedStyle(el).opacity === '0') continue;
-      const fs = parseFloat(getComputedStyle(el).fontSize);
-      if (fs < 19.99) {
-        const k = `${el.className}|${t.slice(0, 20)}`;
-        if (!seen.has(k)) { seen.add(k); out.push(`TEXTO ${fs}px "${t.slice(0, 24)}" .${el.className}`); }
-      }
-    }
-    return out.map((o) => `[${label}] ${o}`);
-  }, label);
+const only = process.argv[2]?.split(',');
+const SHOT = process.env.SHOT;
+const ALL_SHOTS = new Set(['idle', 'mail-arrived', 'mail-open', 'drawing', 'drawing-line', 'extra', 'extra-free', 'celebracao-dupla', 'celebracao-bingo', 'gift', 'prizes', 'settings']);
+
+const withMail = (s: SaveData, kind: 'daily' | 'bonus' = 'daily'): SaveData => {
+  s.lastDailyBonus = kind === 'daily' ? '2000-01-01' : today();
+  s.mail = { day: today(), bonusToday: 0, playMs: 0, pending: { kind, amount: kind === 'daily' ? 300 : 40 } };
+  return s;
+};
+const big = (s: SaveData): SaveData => { s.credits = 1234567; s.jackpot = 1234567; return s; };
+const muito = (s: SaveData): SaveData => { s.settings.textSize = 'muito'; return s; };
+const grande = (s: SaveData): SaveData => { s.settings.textSize = 'grande'; return s; };
+
+function doubleFinal(): SaveData {
+  const s = baseSave(5);
+  const c0 = s.cards[0].nums;
+  const plan = mkPlan(s.cards, { early: [...c0.slice(0, 5), ...c0.slice(5, 9)], late: [c0[9]] });
+  return withRound(s, plan, { mainIdx: 29, credits: 800, turbo: true });
+}
+function lineEarly(): SaveData {
+  const s = baseSave(5);
+  const c0 = s.cards[0].nums;
+  const plan = mkPlan(s.cards, { early: [...c0.slice(0, 5), ...c0.slice(5, 9)] }); // linha 0 + 4 da linha 1: "falta 1" a seguir
+  s.settings.speed = 'lenta';
+  return withRound(s, plan, { mainIdx: 9, credits: 980 });
 }
 
-async function seed(page: Page, save: unknown) {
-  await page.addInitScript('window.__name = (f) => f;');
-  await page.addInitScript(([k, v]) => { try { if (!localStorage.getItem('__qa_seeded')) { localStorage.setItem(k as string, v as string); localStorage.setItem('__qa_seeded', '1'); } } catch {} }, [KEY, JSON.stringify(save)]);
-}
+type State = [string, () => SaveData | null, (p: Page) => Promise<void>];
+const gear = async (p: Page) => { await p.locator('.top .gear').click(); await p.waitForTimeout(350); };
+const pin = async (p: Page) => { for (let i = 0; i < 5; i++) await p.locator('.top .logo').click(); await p.waitForTimeout(350); };
+const ent = async (p: Page, ms = 400) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(ms); };
+
+const STATES: State[] = [
+  ['splash', () => baseSave(), async () => {}],
+  ['idle', () => baseSave(), (p) => ent(p)],
+  ['mail-arrived', () => withMail(baseSave()), (p) => ent(p, 700)],
+  ['mail-bonus', () => withMail(baseSave(), 'bonus'), (p) => ent(p, 700)],
+  ['mail-open', () => withMail(baseSave()), async (p) => { await ent(p, 500); await p.locator('.mailb').click(); await p.waitForTimeout(600); }],
+  ['idle-7digitos', () => big(baseSave()), (p) => ent(p, 900)],
+  ['idle-bet10', () => { const s = baseSave(); s.bet = 10; s.credits = 12345; return s; }, (p) => ent(p, 600)],
+  ['idle-bet1', () => { const s = baseSave(); s.bet = 1; return s; }, (p) => ent(p, 600)],
+  ['idle-cartelas1', () => { const s = baseSave(); s.active = [true, false, false, false]; return s; }, (p) => ent(p, 600)],
+  ['drawing', () => blankRound({ mainIdx: 8, credits: 980 }), (p) => ent(p, 900)],
+  ['drawing-line', () => lineEarly(), (p) => ent(p, 900)],
+  ['drawing-turbo', () => blankRound({ mainIdx: 8, credits: 980, turbo: true }), (p) => ent(p, 300)],
+  ['extra', () => nearDouble({ free: [false] }), async (p) => { await ent(p, 300); await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600); }],
+  ['extra-free', () => nearDouble({ free: [true] }), async (p) => { await ent(p, 300); await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600); }],
+  ['extra-bingo', () => nearBingo({ mainIdx: 30, free: [false], extrasDecisive: true }), async (p) => { await ent(p, 300); await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600); }],
+  ['extra-7digitos', () => big(nearBingo({ mainIdx: 30, free: [false], bet: 10, extrasDecisive: true })), async (p) => { await ent(p, 300); await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600); }],
+  ['extra-3-de-9', () => { const s = nearBingo({ mainIdx: 30, bet: 2, credits: 3000, extrasDecisive: true, free: Array(9).fill(false), turbo: true }); s.round!.plan.extras = fillers(s.cards, 9); return s; }, async (p) => {
+    await ent(p, 300);
+    for (let i = 0; i < 3; i++) { await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.locator('.xbuy').click(); await p.waitForTimeout(1500); }
+    await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600);
+  }],
+  ['celebracao-dupla', () => doubleFinal(), async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
+  ['celebracao-bingo', () => nearBingo({ mainIdx: 29, turbo: true }), async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
+  ['celebracao-bingo-leve', () => { const s = nearBingo({ mainIdx: 29, turbo: true }); s.settings.light = true; s.settings.lightManual = true; return s; }, async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
+  ['celebracao-7digitos', () => big(nearBingo({ mainIdx: 29, turbo: true, bet: 10 })), async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
+  ['gift', () => { const s = baseSave(); s.credits = 20; return s; }, async (p) => { await ent(p); await p.locator('button.play').click(); await p.waitForSelector('text=PEGAR'); await p.waitForTimeout(500); }],
+  ['prizes', () => baseSave(), async (p) => { await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500); }],
+  ['prizes-bet1', () => { const s = baseSave(); s.bet = 1; return s; }, async (p) => { await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500); }],
+  ['prizes-variado', () => baseSave(), async (p) => {
+    await ent(p); await pin(p);
+    for (const k of '1958') await p.locator('.keys button', { hasText: new RegExp(`^${k}$`) }).click();
+    await p.waitForTimeout(300);
+    await p.evaluate(() => { localStorage.setItem('altina-da-sorte:patternSet', 'variado'); });
+    await p.reload(); await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500);
+  }],
+  ['settings', () => baseSave(), async (p) => { await ent(p); await gear(p); }],
+  ['settings-jogo', () => baseSave(), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(1).click(); await p.waitForTimeout(300); }],
+  ['settings-tela', () => baseSave(), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(2).click(); await p.waitForTimeout(300); }],
+  ['pin', () => baseSave(), async (p) => { await ent(p); await pin(p); }],
+  ['admin', () => baseSave(), async (p) => { await ent(p); await pin(p); for (const k of '1958') await p.locator('.keys button', { hasText: new RegExp(`^${k}$`) }).click(); await p.waitForTimeout(500); }],
+  ['idle-textogrande', () => grande(baseSave()), (p) => ent(p, 600)],
+  ['idle-textomuito', () => muito(baseSave()), (p) => ent(p, 600)],
+  ['mail-open-textomuito', () => muito(withMail(baseSave())), async (p) => { await ent(p, 500); await p.locator('.mailb').click(); await p.waitForTimeout(600); }],
+  ['extra-textomuito', () => muito(nearDouble({ free: [true] })), async (p) => { await ent(p, 300); await p.waitForSelector('.xpanel:not(.hide)', { timeout: 15000 }); await p.waitForTimeout(600); }],
+  ['celebracao-textomuito', () => muito(nearBingo({ mainIdx: 29, turbo: true })), async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
+  ['settings-textomuito', () => muito(baseSave()), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(1).click(); await p.waitForTimeout(300); }],
+  ['prizes-textomuito', () => muito(baseSave()), async (p) => { await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500); }],
+  ['drawing-textomuito', () => muito(blankRound({ mainIdx: 8, credits: 980 })), (p) => ent(p, 900)],
+];
 
 (async () => {
-  const browser = await chromium.launch({ executablePath: EXE, args: ['--autoplay-policy=no-user-gesture-required'] });
+  if (SHOT) mkdirSync(SHOT, { recursive: true });
+  const browser = await launch();
   const all: string[] = [];
-  const states: [string, () => unknown, (p: Page) => Promise<void>][] = [
-    ['splash', () => baseSave(), async () => {}],
-    ['idle', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(500); }],
-    ['prizes', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); await p.locator('button.s2').click(); await p.waitForTimeout(400); }],
-    ['settings', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); await p.locator('.top button.icon').nth(1).click(); await p.waitForTimeout(400); }],
-    ['pin', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); for (let i = 0; i < 5; i++) await p.locator('.top .logo').click(); await p.waitForTimeout(400); }],
-    ['admin', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); for (let i = 0; i < 5; i++) await p.locator('.top .logo').click(); for (const k of '1958') await p.locator('.keys button', { hasText: new RegExp(`^${k}$`) }).click(); await p.waitForTimeout(400); }],
-    ['drawing', () => baseSave(), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); await p.locator('button.play').click(); await p.waitForTimeout(9000); }],
-    ['extraOffer', () => roundNearBingo(30), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForSelector('text=BOLA EXTRA', { timeout: 8000 }); await p.waitForTimeout(500); }],
-    ['bingo-celebration', () => roundNearBingo(29), async (p) => { await p.getByText('ENTRAR').click(); await p.waitForSelector('text=TERMINAR', { timeout: 20000 }); await p.getByRole('button', { name: /TERMINAR/ }).click(); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1800); }],
-    ['gift', () => { const s = baseSave(); s.credits = 20; return s; }, async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(300); await p.locator('button.play').click(); await p.waitForSelector('text=PEGAR'); await p.waitForTimeout(400); }],
-    ['muito-grande-idle', () => { const s = baseSave(); s.settings.textSize = 'muito'; return s; }, async (p) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(400); }],
-    ['muito-grande-extra', () => { const s = roundNearBingo(30); s.settings.textSize = 'muito'; return s; }, async (p) => { await p.getByText('ENTRAR').click(); await p.waitForSelector('text=BOLA EXTRA', { timeout: 8000 }); await p.waitForTimeout(500); }],
-  ];
+  let n = 0;
   for (const vp of VIEWPORTS) {
-    for (const [name, mk, run] of states) {
-      const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, serviceWorkers: 'block' });
-      const page = await ctx.newPage();
-      const errs: string[] = [];
-      page.on('pageerror', (e) => errs.push(String(e)));
-      await seed(page, mk());
-      await page.goto(BASE + '/');
-      try { await run(page); } catch (e) { all.push(`[${vp.w}x${vp.h} ${name}] FALHA ao forçar estado: ${String(e).split('\n')[0]}`); }
-      const res = await audit(page, `${vp.w}x${vp.h} ${name}`);
+    for (const [name, mk, run] of STATES) {
+      if (only && !only.includes(name)) continue;
+      const c = await open(browser, mk(), { width: vp.w, height: vp.h });
+      n++;
+      try {
+        await run(c.page);
+      } catch (e) {
+        all.push(`[${vp.w}x${vp.h} ${name}] FALHA ao forçar estado: ${String(e).split('\n')[0]}`);
+      }
+      const res = await audit(c.page, `${vp.w}x${vp.h} ${name}`);
       all.push(...res);
-      if (process.env.SHOT) await page.screenshot({ path: `${process.env.SHOT}/${name}-${vp.w}x${vp.h}.png` });
-      if (errs.length) all.push(`[${vp.w}x${vp.h} ${name}] ERROS JS: ${errs.join(' | ')}`);
-      await ctx.close();
+      if (SHOT) {
+        const wanted = ALL_SHOTS.has(name) || (vp.w === 1280 || vp.w === 360);
+        if (wanted) await c.page.screenshot({ path: `${SHOT}/review2-${name}-${vp.w}x${vp.h}.png` });
+      }
+      if (c.errs.length) all.push(`[${vp.w}x${vp.h} ${name}] ERROS JS: ${c.errs.join(' | ')}`);
+      if (c.bad.length) all.push(`[${vp.w}x${vp.h} ${name}] REQUISIÇÕES RUINS: ${c.bad.join(' | ')}`);
+      await c.ctx.close();
     }
   }
   await browser.close();
   console.log(all.length ? all.join('\n') : 'OK sem violações');
+  console.log(`\n${n} combinações estado x viewport; ${all.length} achado(s)`);
 })();
+void blankRound;

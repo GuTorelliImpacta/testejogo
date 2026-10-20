@@ -219,8 +219,14 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
       }
       syncMusicPlayback();
     },
-    greet(hour) {
-      return narrator.say(`greet_${periodOf(hour)}`, { dropIfBusy: false, preempt: false });
+    async greet(hour) {
+      // espera o clipe carregar (até 1,5 s) para a saudação sair na voz gravada, não na do tablet
+      const id = `greet_${periodOf(hour)}`;
+      const t0 = Date.now();
+      while (engine.has(id) && !engine.isLoaded(id) && Date.now() - t0 < 1500) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      return narrator.say(id, { dropIfBusy: false, preempt: false });
     },
     waitForSpeech() {
       if (pendingWin) flushWin();

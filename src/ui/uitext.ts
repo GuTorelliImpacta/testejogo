@@ -93,6 +93,8 @@ export const U = {
   import: 'Importar',
   resetJackpot: 'Zerar acumulado',
   resetCredits: 'Zerar créditos',
+  patternSetClassic: 'Padrões: Clássico (3)',
+  patternSetVaried: 'Padrões: Variado (7)',
   sure: 'Toque de novo para confirmar',
   importOk: 'Importado com sucesso',
   importFail: 'Arquivo inválido',

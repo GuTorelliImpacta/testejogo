@@ -352,3 +352,22 @@ Cada cartela é um array de 15 números + bitmask de marcados (15 bits). Padrõe
 5. **PWA e persistência** (`perf-pwa-engineer`): offline, cache do áudio, wake lock, ajustes e painel admin.
 6. **Otimização** (`perf-pwa-engineer`): medir bundle e Lighthouse, modo leve, eliminar jank.
 7. **Revisão final** (`qa-reviewer`) e **deploy na Vercel**, com relatório final para mim.
+
+
+---
+# Atualização v2 (fidelidade ao vídeo bingo de 90 bolas) — o que mudou
+Detalhes do pedido em `docs/SPEC-v2.md`. Onde houver conflito, **vale esta seção**.
+
+- **Bolas 1–90**; sorteio principal de 30; cartelas 3×5, coluna `c` usa `18c+1..18c+18`.
+- **Aposta por cartela 1–10** (padrão 5); **cartelas 1–4** por controle − / + (tocar na cartela não faz nada); botão **Números** gera cartelas novas.
+- **Prêmios (conjunto `classico`, padrão):** Linha ×5, Linha dupla ×25, Bingo ×500 (+ Acumulado). Conjunto `variado` (7 padrões) por `PATTERN_SETS` em `config.ts`, trocado no painel do administrador.
+- **Acumulado:** começa em 5.000 e cresce 2% da aposta total por rodada (fracionário; exibido/pago com `floor`). Paga se o Bingo sair até a 30ª bola: 100% (aposta ≥3), 75% (aposta 2), 50% (aposta 1), somado ao ×500. Bingo na bola extra não paga acumulado.
+- **Bolas extras:** até **9**; só com "falta 1" para prêmio melhor; custo dinâmico (8% do maior ganho, valor redondo); **bola extra grátis** (≈17,5% das ofertas, `plan.free`).
+- **Turbo** (toggle, salvo): bolas a ~120 ms, voz só nos prêmios e na oferta de extra.
+- **Correio da sorte:** carta 📬 no topo; diário (+300) na 1ª abertura do dia, e ocasional (10–100, máx. 2/dia, após 30 min jogados); nunca durante o sorteio.
+- **Tela:** trilho de 30 bolas + 9 casas de extra, contador, tabela de prêmios fixa, painel de bola extra no lugar da bola (não modal), selos de prêmio nas cartelas.
+- **Voz:** 142 clipes pt-BR gerados com **Piper (voz "faber", dataset CC0)** + pós-processamento animado (+10% velocidade, tom, vogais esticadas); `manifest.json` evita requisições 404; voz própria em `voice-custom/` substitui. Bordões de bingo (liga/desliga em Ajustes). Prévia: `npm run audio:preview` → `docs/qa/audio-preview.wav`.
+- **Dados:** save `version: 2` (migra v1 preservando saldo, acumulado, diretor e estatísticas; descarta a rodada em andamento, aposta 20→10).
+- **Modo leve:** automático só depois de 3 rodadas e nunca sobrescreve a escolha manual; `prefers-reduced-motion` só sugere na 1ª abertura.
+- **Diretor:** metas v2 validadas por `npm run simulate` (2–3 bingos/mês; sem prêmio 55–62%; ≥1 Linha 30–38%; extra 25–35%; ≤~20 recargas/90 dias no perfil de 120 rodadas/dia).
+- **Medido:** Lighthouse mobile Performance 100 (`docs/qa/lighthouse.md`); JS 33 KB gzip; CSS 6,5 KB; primeira carga ≈41 KB gzip; voz ≈0,6 MB baixada após ENTRAR.

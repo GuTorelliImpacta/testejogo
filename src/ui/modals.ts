@@ -299,6 +299,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   const refreshAdmin = () => {
     try {
       aSnap.textContent = JSON.stringify(api.admin.snapshot(), null, 1);
+      if (typeof bSet !== 'undefined') bSet.textContent = setLabel();
     } catch {
       aSnap.textContent = '-';
     }
@@ -336,12 +337,24 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   }, 300);
   const bJ: HTMLButtonElement = btn('', U.resetJackpot, () => sure('j', () => api.admin.resetJackpot(), bJ, U.resetJackpot), 300);
   const bC: HTMLButtonElement = btn('', U.resetCredits, () => sure('c', () => api.admin.resetCredits(), bC, U.resetCredits), 300);
+  const setLabel = () => {
+    const cur = (api.admin.snapshot() as { conjuntoDePadroes?: string } | null)?.conjuntoDePadroes;
+    return cur === 'variado' ? U.patternSetVaried : U.patternSetClassic;
+  };
+  const bSet: HTMLButtonElement = btn('', setLabel(), () => {
+    const cur = (api.admin.snapshot() as { conjuntoDePadroes?: string } | null)?.conjuntoDePadroes;
+    api.admin.setPatternSet(cur === 'variado' ? 'classico' : 'variado');
+    bSet.textContent = setLabel();
+    refreshAdmin();
+  }, 300);
+  const aRow3 = h('div', 'row');
+  aRow3.append(bSet);
   const aRow1 = h('div', 'row');
   aRow1.append(bExp, bImp);
   const aRow2 = h('div', 'row');
   aRow2.append(bJ, bC);
   A.head.append(h('h2', '', U.adminTitle));
-  A.body.append(aSnap, aText, aMsg, aRow1, aRow2);
+  A.body.append(aSnap, aText, aMsg, aRow1, aRow2, aRow3);
   A.foot.append(closeBtn(() => { pend = null; setLocal(null); }));
 
   const all = [P, S, G, M, C, N, A];
@@ -396,7 +409,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
           const el = pRows.get(pattern);
           if (el) setText(el, fmt(prize));
         }
-        setText(jkV, fmt(v.jackpot * v.jackpotShare));
+        setText(jkV, fmt(Math.floor(v.jackpot * v.jackpotShare)));
         setText(jkRule, U.jackpotRuleShare(v.jackpotShare));
       }
       if (showS) {
