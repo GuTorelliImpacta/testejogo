@@ -371,3 +371,16 @@ Detalhes do pedido em `docs/SPEC-v2.md`. Onde houver conflito, **vale esta seç�
 - **Modo leve:** automático só depois de 3 rodadas e nunca sobrescreve a escolha manual; `prefers-reduced-motion` só sugere na 1ª abertura.
 - **Diretor:** metas v2 validadas por `npm run simulate` (2–3 bingos/mês; sem prêmio 55–62%; ≥1 Linha 30–38%; extra 25–35%; ≤~20 recargas/90 dias no perfil de 120 rodadas/dia).
 - **Medido:** Lighthouse mobile Performance 100 (`docs/qa/lighthouse.md`); JS 33 KB gzip; CSS 6,5 KB; primeira carga ≈41 KB gzip; voz ≈0,6 MB baixada após ENTRAR.
+
+
+---
+# Atualização v3 (responsivo em tudo + painel do neto) — o que mudou
+Pedido completo em `docs/SPEC-v3.md`. Onde houver conflito, **vale esta seção**.
+
+- **Responsivo:** sem aviso de girar; layouts para 25 viewports (tablet deitado/em pé, celular deitado/em pé); logo sempre visível; alvos ≥64 px, texto ≥20 px, sem rolagem; auditoria `tests/e2e/ui-audit.ts` com 0 achados.
+- **Painel do neto:** 5 toques no logo ou Ajustes → "Painel do neto 🔒". Abas Resumo, Jogo, PIN, Aparelho. PIN padrão `1958` (`ADMIN_PIN` em `src/config.ts`); troca pelo painel; `?resetpin=1` volta ao padrão.
+- **Tuning em tempo de execução** (`RuntimeTuning`, no save v3): bingos por mês 1 | 2 | 2–3 | 3–4; prêmios do dia a dia; oferta e chance de grátis da extra; custo da extra; presente 500/1000/2000; correio 300/500; conjunto de padrões. Vale na próxima rodada. 12 presets validados: `npm run simulate -- --preset all`.
+- **Save v3:** migra v1/v2 preservando saldo, acumulado, diretor, estatísticas e (v2) rodada em andamento.
+- **Áudio leve:** música pré-renderizada em `OfflineAudioContext` (CPU da música ≈ 0), decodificação de voz sob demanda com LRU, `AudioContext` suspenso quando parado, modo econômico (24 kHz).
+- **Compatibilidade:** alvo Android 5/6 (Chrome/WebView ~60); CSS com fallbacks.
+- **Pendente (não medido):** metas de desempenho 3.5.7 em CPU 6×/20×, teste de resistência de 250 rodadas, teste de rotação no app real e revisão QA completa da fase 3 (agentes interrompidos). Dados reais virão da aba "Aparelho" no tablet.
