@@ -469,8 +469,8 @@
   .altina .xpanel { gap: 8px; padding: 8px; }
   .altina .xpanel .btn.big { min-height: 72px; }
 }
-/* texto "Muito grande": numeros do topo e contador nao cortam embaixo */
-.altina .stat .val, .altina .counter { line-height: 1.12; }
+/* texto "Grande/Muito grande": numeros do topo e contador nao cortam embaixo */
+.altina.ts-grande .stat .val, .altina.ts-grande .counter, .altina.ts-muito .stat .val, .altina.ts-muito .counter { line-height: 1.12; }
 @media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
   .altina .bar .rowa, .altina .bar .rowb { gap: 12px; }
   .altina .grp { gap: 2px 12px; }
@@ -499,3 +499,20 @@
 }
 /* a tabela de premios ja usa letra grande: "Texto grande/muito grande" nao a faz estourar */
 .altina.ts-grande .ptab, .altina.ts-muito .ptab { --ts: 1; }
+
+/* celular: o botao JOGAR nao cresce com o tamanho do texto (ja e enorme) */
+@media (orientation: portrait) and (max-width: 599px) {
+  .altina.ts-grande .btn.g-play, .altina.ts-muito .btn.g-play { font-size: 30px; }
+}
+/* tablet deitado baixo: painel da bola extra nao cresce com o texto e nao empurra a barra */
+@media (orientation: landscape) and (max-height: 680px) {
+  .altina.ts-grande .xpanel, .altina.ts-muito .xpanel { --ts: 1; }
+}
+/* tablet em pe estreito com correio: o trevo do topo sai para "Acumulado" caber */
+@media (orientation: portrait) and (min-width: 600px) and (max-width: 720px) {
+  .altina.has-mail .top .logo { display: none; }
+}
+/* celular: texto grande/muito grande sem apertar as cartelas (os numeros das cartelas ja usam o maximo) */
+@media (orientation: portrait) and (max-width: 599px) and (max-height: 820px) {
+  .altina.ts-grande, .altina.ts-muito { --ts: 1; --tsb: 1; }
+}
