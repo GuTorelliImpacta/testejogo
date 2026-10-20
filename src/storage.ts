@@ -62,8 +62,25 @@ export function migrate(raw: unknown, now: number): SaveData | null {
     director: { ...base.director, ...(r.director ?? {}) },
     stats: { ...emptyStats(), ...(r.stats ?? {}) },
     lastDailyBonus: typeof r.lastDailyBonus === 'string' ? r.lastDailyBonus : '',
-    round: cardsOk && r.round && Array.isArray(r.round.plan?.main) ? r.round : null,
+    round: validRound(r.round) ? r.round : null,
   };
+}
+
+function validRound(x: unknown): x is NonNullable<SaveData['round']> {
+  const r = x as SaveData['round'];
+  if (!r || typeof r !== 'object') return false;
+  const nums = (a: unknown, n: number) =>
+    Array.isArray(a) && a.length >= n && a.every((v) => Number.isInteger(v) && v >= 1 && v <= 60);
+  return (
+    [1, 2, 5, 10, 20].includes(r.bet) &&
+    typeof r.jackpot === 'number' &&
+    nums(r.plan?.main, 30) &&
+    nums(r.plan?.extras, 0) &&
+    Number.isInteger(r.mainIdx) && r.mainIdx >= 0 && r.mainIdx <= 30 &&
+    Number.isInteger(r.extrasUsed) && r.extrasUsed >= 0 && r.extrasUsed <= (r.plan?.extras?.length ?? 0) &&
+    Array.isArray(r.active) && r.active.length === 4 && r.active.some(Boolean) &&
+    Array.isArray(r.cards) && r.cards.length === 4 && r.cards.every((c) => nums(c?.nums, 15))
+  );
 }
 
 export function load(now: number): SaveData {

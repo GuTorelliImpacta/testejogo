@@ -8,7 +8,13 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches
       .open(SHELL)
-      .then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg']))
+      .then(async (c) => {
+        await c.addAll(['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg']);
+        // pré-cacheia os JS/CSS do app (nomes com hash) lidos do HTML
+        const html = await (await fetch('/', { cache: 'reload' })).text();
+        const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+        await c.addAll(urls);
+      })
       .then(() => self.skipWaiting()),
   );
 });
@@ -36,13 +42,13 @@ self.addEventListener('fetch', (e) => {
           caches.open(SHELL).then((c) => c.put('/', copy));
           return res;
         })
-        .catch(() => caches.match('/')),
+        .catch(() => caches.match('/', { ignoreVary: true })),
     );
     return;
   }
 
   e.respondWith(
-    caches.match(req).then(
+    caches.match(req, { ignoreVary: true }).then(
       (hit) =>
         hit ||
         fetch(req).then((res) => {

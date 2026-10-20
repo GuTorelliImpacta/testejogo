@@ -241,7 +241,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         credits: data.credits,
         bet: data.bet,
         totalBet: totalBet(),
-        jackpot: data.jackpot,
+        jackpot: Math.floor(data.jackpot),
         cards: data.cards,
         active: data.active,
         drawn,
@@ -316,7 +316,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         director: data.director,
         rng: cryptoRng,
       });
-      const s = new RoundSession(data.cards, data.active, data.bet, data.jackpot, plan);
+      const s = new RoundSession(data.cards, data.active, data.bet, Math.floor(data.jackpot), plan);
       bus.emit('roundStart', { bet: data.bet, totalBet: bet });
       startSession(s);
     },
@@ -344,6 +344,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       data.credits += giftAmount;
       data.stats.recargas++;
       giftAmount = 0;
+      auto = false;
       phase = 'idle';
       persist(false);
       saveNow(data);
@@ -404,7 +405,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         const avg = days.length ? st.rodadas / days.length : 0;
         return {
           credits: data.credits,
-          jackpot: data.jackpot,
+          jackpot: Math.floor(data.jackpot),
           historicoBingos: data.director.historicoBingos.map((t) => new Date(t).toLocaleDateString('pt-BR')),
           bingosPorMes: data.director.bingosPorMes,
           rodadas: st.rodadas,

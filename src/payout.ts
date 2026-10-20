@@ -8,7 +8,7 @@ export function prizeFor(pattern: PatternId | null, bet: number): number {
 }
 
 export function nextJackpot(current: number, totalBet: number): number {
-  return Math.round(current + totalBet * JACKPOT_GROWTH);
+  return current + totalBet * JACKPOT_GROWTH; // fracionário; exibir/pagar com Math.floor
 }
 
 export { JACKPOT_BASE };

@@ -105,7 +105,8 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
     bus.on('ballDrawn', (e) => {
       if (e.fast || fast) return; // acelerado: só prêmios
       sfx.ballDraw();
-      void narrator.say(numberId(e.ball));
+      // não corta a fala de início ("Valendo!")
+      void narrator.say(numberId(e.ball), { preempt: narrator.currentCategory !== 'start' });
     }),
     bus.on('almost', (e) => {
       sfx.almost();
