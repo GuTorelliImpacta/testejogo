@@ -25,18 +25,72 @@ export class Sfx {
     tone(v, d, { freq: f * 2.76, t, dur: dur * 0.3, gain: g * 0.25 });
   }
 
-  /** Bola girando e saindo: chocalho de madeira que acelera e um "toc" final. */
+  /**
+   * Globo girando e a bola rolando até sair (≤ 400 ms): zumbido de ruído, estalinhos de
+   * bolas batendo que aceleram e um "toc" final.
+   */
   ballDraw(): void {
     const e = this.env();
     if (!e) return;
-    let t = e.t;
-    let gap = 0.075;
-    for (let i = 0; i < 6; i++) {
-      noiseHit(e.v, e.d, { t, dur: 0.03, gain: 0.16, filter: 'bandpass', freq: 1500 + i * 220, q: 3 });
-      t += gap;
-      gap *= 0.84;
+    const { v, d, t } = e;
+    noiseHit(v, d, { t, dur: 0.24, gain: 0.05, filter: 'bandpass', freq: 520, q: 1.2, attack: 0.05 });
+    noiseHit(v, d, { t: t + 0.06, dur: 0.2, gain: 0.035, filter: 'bandpass', freq: 1150, q: 1.5, attack: 0.05 });
+    let at = t + 0.01;
+    let gap = 0.062;
+    for (let i = 0; i < 5; i++) {
+      noiseHit(v, d, { t: at, dur: 0.025, gain: 0.15, filter: 'bandpass', freq: 1700 + i * 260, q: 3 });
+      at += gap;
+      gap *= 0.85;
     }
-    tone(e.v, e.d, { freq: 520, glideTo: 780, t, dur: 0.14, gain: 0.22, type: 'triangle' });
+    tone(v, d, { freq: 520, glideTo: 780, t: t + 0.3, dur: 0.09, gain: 0.2, type: 'triangle' });
+  }
+
+  /** Turbo: só um tique no lugar do globo. */
+  tick(): void {
+    const e = this.env();
+    if (!e) return;
+    tone(e.v, e.d, { freq: 1150, t: e.t, dur: 0.035, gain: 0.08, type: 'triangle' });
+  }
+
+  /** "Plim" dourado: bola extra grátis e correio da sorte. */
+  plim(): void {
+    const e = this.env();
+    if (!e) return;
+    this.bell(e.v, e.d, e.t, 96, 0.13, 0.9);
+    this.bell(e.v, e.d, e.t + 0.09, 103, 0.11, 1.1);
+    this.bell(e.v, e.d, e.t + 0.18, 108, 0.07, 1.3);
+    noiseHit(e.v, e.d, { t: e.t + 0.05, dur: 0.5, gain: 0.02, filter: 'highpass', freq: 8000, attack: 0.02 });
+  }
+
+  /** Linha: arpejo curto e luminoso (~1 s). */
+  jingleLinha(): void {
+    const e = this.env();
+    if (!e) return;
+    [76, 79, 83, 88].forEach((m, i) => this.bell(e.v, e.d, e.t + i * 0.08, m, 0.15, 0.7));
+    this.bell(e.v, e.d, e.t + 0.4, 91, 0.1, 0.9);
+  }
+
+  /** Linha dupla: duas subidas seguidas e acorde brilhante (~1,8 s). */
+  jingleLinhaDupla(): void {
+    const e = this.env();
+    if (!e) return;
+    [72, 76, 79, 84].forEach((m, i) => this.bell(e.v, e.d, e.t + i * 0.075, m, 0.15, 0.6));
+    [79, 83, 86, 91].forEach((m, i) => this.bell(e.v, e.d, e.t + 0.42 + i * 0.075, m, 0.16, 0.7));
+    const tc = e.t + 0.8;
+    [79, 84, 88, 91, 96].forEach((m) => this.bell(e.v, e.d, tc, m, 0.1, 1.2));
+    this.coins(5);
+  }
+
+  /** Acumulado: chuva de sinos descendo e acorde grande (~3 s). */
+  jingleJackpot(): void {
+    const e = this.env();
+    if (!e) return;
+    const sc = [96, 93, 91, 88, 84, 81, 79, 76];
+    for (let i = 0; i < 16; i++) this.bell(e.v, e.d, e.t + i * 0.085, sc[i % sc.length], 0.11, 0.8);
+    const tc = e.t + 1.45;
+    [60, 67, 72, 76, 79, 84].forEach((m) => this.bell(e.v, e.d, tc, m, 0.12, 2.0));
+    tone(e.v, e.d, { freq: 90, glideTo: 55, t: tc, dur: 0.4, gain: 0.4 });
+    noiseHit(e.v, e.d, { t: tc, dur: 1.4, gain: 0.04, filter: 'highpass', freq: 6000, attack: 0.03 });
   }
 
   /** Marcação de número: tique bem suave. */

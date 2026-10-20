@@ -1,12 +1,12 @@
 import type { Card } from './types';
-import { CARD_COUNT } from './types';
+import { CARD_COUNT, COL_SPAN } from './types';
 import type { Rng } from './rng';
 
-/** Coluna c contém 12c+1..12c+12; 3 números por coluna, ordenados de cima para baixo. */
+/** Coluna c contém 18c+1..18c+18; 3 números por coluna, ordenados de cima para baixo. */
 export function generateCard(rng: Rng): Card {
   const nums = new Array<number>(15);
   for (let c = 0; c < 5; c++) {
-    const pool = Array.from({ length: 12 }, (_, i) => 12 * c + 1 + i);
+    const pool = Array.from({ length: COL_SPAN }, (_, i) => COL_SPAN * c + 1 + i);
     for (let i = 0; i < 3; i++) {
       const j = i + Math.floor(rng() * (pool.length - i));
       [pool[i], pool[j]] = [pool[j], pool[i]];
@@ -28,7 +28,7 @@ export function isValidCard(card: Card): boolean {
     let prev = 0;
     for (let r = 0; r < 3; r++) {
       const n = card.nums[r * 5 + c];
-      if (n < 12 * c + 1 || n > 12 * c + 12 || n <= prev) return false;
+      if (n < COL_SPAN * c + 1 || n > COL_SPAN * c + COL_SPAN || n <= prev) return false;
       prev = n;
     }
   }

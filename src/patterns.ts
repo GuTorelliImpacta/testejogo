@@ -1,5 +1,6 @@
 import type { Mask, PatternId } from './types';
 import { PATTERN_ORDER } from './types';
+import { activePatterns } from './config';
 
 /** Constrói máscara a partir de 3 strings de 5 caracteres ('X' = exigido). */
 function m(rows: [string, string, string]): Mask {
@@ -49,10 +50,11 @@ export function isComplete(marked: Mask, pattern: PatternId): boolean {
   return missing(marked, pattern) === 0;
 }
 
-/** Maior padrão completo, ou null. */
+/** Maior padrão ATIVO completo, ou null. */
 export function bestPattern(marked: Mask): PatternId | null {
-  for (let i = PATTERN_ORDER.length - 1; i >= 0; i--) {
-    if (isComplete(marked, PATTERN_ORDER[i])) return PATTERN_ORDER[i];
+  const act = activePatterns();
+  for (let i = act.length - 1; i >= 0; i--) {
+    if (isComplete(marked, act[i])) return act[i];
   }
   return null;
 }
@@ -60,8 +62,10 @@ export function bestPattern(marked: Mask): PatternId | null {
 /** Maior padrão estritamente melhor que o atual a exatamente 1 número de completar. */
 export function bestReachableByOne(marked: Mask): PatternId | null {
   const cur = levelOf(bestPattern(marked));
-  for (let i = PATTERN_ORDER.length - 1; i >= cur; i--) {
-    if (missing(marked, PATTERN_ORDER[i]) === 1) return PATTERN_ORDER[i];
+  const act = activePatterns();
+  for (let i = act.length - 1; i >= 0; i--) {
+    if (levelOf(act[i]) <= cur) break;
+    if (missing(marked, act[i]) === 1) return act[i];
   }
   return null;
 }

@@ -1,5 +1,6 @@
 import type { Card, DrawPlan, PatternId } from './types';
-import { BALLS_EXTRA_MAX, BALLS_MAIN, MAX_NUMBER, PATTERN_ORDER } from './types';
+import { BALLS_EXTRA_MAX, BALLS_MAIN, MAX_NUMBER } from './types';
+import { activePatterns } from './config';
 import type { Rng } from './rng';
 import { randInt, shuffle } from './rng';
 import { MASKS, bestPattern, bestReachableByOne, levelOf, missing } from './patterns';
@@ -264,7 +265,7 @@ function attempt(
     for (const c of cells) if (c !== xc && !tryAdd(fc.nums[c])) return null;
   } else if (mode === 'miss') {
     const cur = t.maxPattern[focus] ?? null;
-    const next = PATTERN_ORDER[levelOf(cur)];
+    const next = nextActive(cur);
     if (!next || next === 'bingo') return null;
     if (cur) {
       const own = cheapestMask(fc, cur, main, rng);
@@ -450,16 +451,28 @@ function satisfies(ev: Evaluation, active: boolean[], e: Expect): boolean {
 // Rebaixamento e API pública
 // ---------------------------------------------------------------------------
 
+/** Padrões do conjunto ativo abaixo do bingo (ordem crescente). */
+export function tiersBelowBingo(): PatternId[] {
+  return activePatterns().filter((p) => p !== 'bingo');
+}
+
+/** Próximo padrão ativo acima de `p` (null = o menor ativo). */
+function nextActive(p: PatternId | null): PatternId | null {
+  const lv = levelOf(p);
+  return activePatterns().find((q) => levelOf(q) > lv) ?? null;
+}
+
 function lower(p: PatternId | null): PatternId | null {
   const lv = levelOf(p);
-  return lv <= 1 ? null : PATTERN_ORDER[lv - 2];
+  const below = activePatterns().filter((q) => levelOf(q) < lv);
+  return below.length ? below[below.length - 1] : null;
 }
 
 function downgrade(t: DrawTarget, active: boolean[]): DrawTarget | null {
   const focus = resolveFocus(t, active);
   if (t.bingo) {
     const mp = t.maxPattern.slice();
-    mp[focus] = 'moldura';
+    mp[focus] = tiersBelowBingo().pop() ?? null;
     return { maxPattern: mp, extra: 'none', focus };
   }
   if (t.almost) return { maxPattern: t.maxPattern.slice(), extra: 'none', focus };
@@ -471,7 +484,7 @@ function downgrade(t: DrawTarget, active: boolean[]): DrawTarget | null {
 }
 
 /**
- * Monta 30 bolas + 10 extras coerentes com o alvo e devolve também o alvo efetivo.
+ * Monta 30 bolas + até 9 extras coerentes com o alvo e devolve também o alvo efetivo.
  * Rejection sampling (<= 200 tentativas no total); se falhar, rebaixa o alvo; nunca trava.
  */
 export function buildPlanDetailed(

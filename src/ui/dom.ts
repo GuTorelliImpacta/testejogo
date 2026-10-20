@@ -1,4 +1,5 @@
 // Utilitarios de DOM (sem framework).
+import { BALL_BAND } from '../config';
 
 export function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -52,8 +53,8 @@ export function btn(cls: string, label: string, onPress?: () => void, debounce =
 
 export const fmt = (n: number): string => Math.round(n).toLocaleString('pt-BR');
 
-/** faixa da bola: 1..5 */
-export const range = (n: number): number => Math.min(5, Math.floor((n - 1) / 12) + 1);
+/** faixa da bola (blocos de BALL_BAND = 18): 1..5 */
+export const range = (n: number): number => Math.min(5, Math.max(1, Math.floor((n - 1) / BALL_BAND) + 1));
 
 export function cloverSvg(): string {
   return (
@@ -69,6 +70,8 @@ export function cloverSvg(): string {
 }
 
 export const ICONS = {
+  mail: '<svg viewBox="0 0 64 64" aria-hidden="true"><rect x="6" y="14" width="52" height="36" rx="6" fill="#fff8e1" stroke="#c9971c" stroke-width="3"/><path d="M8 18l24 18 24-18" fill="none" stroke="#c9971c" stroke-width="3" stroke-linejoin="round"/></svg>',
+  turbo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>',
   swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 7h9V4l5 5-5 5v-3H7a3 3 0 0 0-3 3H2a5 5 0 0 1 5-5zm10 10H8v3l-5-5 5-5v3h9a3 3 0 0 0 3-3h2a5 5 0 0 1-5 5z"/></svg>',
   trophy: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 3h12v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V17h3v2H8v-2h3v-2.1A5 5 0 0 1 7.3 12H7a4 4 0 0 1-4-4V5h3zm0 4H5v1a2 2 0 0 0 1 1.7zm12 0v2.7A2 2 0 0 0 19 8V7z"/></svg>',
   fast: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 6l9 6-9 6zm9 0l9 6-9 6z"/></svg>',

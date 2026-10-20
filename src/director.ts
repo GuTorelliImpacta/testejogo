@@ -1,10 +1,10 @@
 import type { Card, DirectorState, DrawPlan, PatternId } from './types';
-import { PATTERN_ORDER } from './types';
-import { TUNING } from './config';
+import { TUNING, getPatternSet } from './config';
+import type { PatternSetName } from './config';
 import type { Rng } from './rng';
 import { randInt, weightedIndex } from './rng';
 import type { DrawTarget, ExtraMode } from './drawBuilder';
-import { buildPlanDetailed } from './drawBuilder';
+import { buildPlanDetailed, tiersBelowBingo } from './drawBuilder';
 
 export const DAY_MS = 86_400_000;
 
@@ -20,10 +20,20 @@ export const DIRECTOR_PARAMS = {
   rodadasParaForcar: 20,
   /** Meses com menos de 2 bingos: reforço quando faltam poucos dias no mês. */
   pressaoMes: true,
-  /** Pesos do nível máximo da rodada comum: nada, linha, cantos, pirâmide, U, linha dupla, moldura. */
-  pesosNivel: [0.61, 0.167, 0.11, 0.052, 0.033, 0.012, 0.015],
+  /**
+   * Pesos do teto da rodada comum, por conjunto de padrões ativo. `nada` = rodada sem prêmio.
+   * Padrões ausentes pesam 0. Valores calibrados com `npm run simulate`.
+   */
+  pesos: {
+    classico: { nada: 0.6, linha: 0.35, linhaDupla: 0.06 },
+    variado: { nada: 0.6, linha: 0.19, cantos: 0.1, piramide: 0.05, u: 0.03, linhaDupla: 0.015, moldura: 0.015 },
+  } as Record<PatternSetName, Partial<Record<PatternId | 'nada', number>>>,
+  /** Chance de a rodada comum ser um quase-bingo (oferta cara que não completa). Substitui TUNING.taxaQuaseBingo. */
+  taxaQuaseBingo: 0.003,
+  /** Fração das ofertas de bola extra que são GRÁTIS (plan.free). Meta: 15-20%. */
+  chanceGratis: 0.175,
   /** Chance de outra cartela ativa também ganhar algo na rodada. */
-  chanceOutraCartela: 0.3,
+  chanceOutraCartela: 0.15,
   /** Rodada sem prêmio: chance de oferta de bola extra que não completa. */
   missSemPremio: 0.22,
   /** Rodada com prêmio: chance de o padrão sair na bola extra / de oferta que não completa. */
@@ -122,7 +132,21 @@ export function bingoChance(director: DirectorState, now: number): number {
 // Escolha do alvo da rodada
 // ---------------------------------------------------------------------------
 
-const TIERS: (PatternId | null)[] = [null, ...PATTERN_ORDER.filter((p) => p !== 'bingo')];
+/** Tetos possíveis de uma rodada comum no conjunto ativo: [null, ...padrões abaixo do bingo]. */
+function tiers(): (PatternId | null)[] {
+  return [null, ...tiersBelowBingo()];
+}
+
+function tierWeights(): number[] {
+  const w = DIRECTOR_PARAMS.pesos[getPatternSet()] ?? {};
+  const t = tiers();
+  return t.map((p) => (p === null ? w.nada ?? 0.6 : w[p] ?? 0));
+}
+
+/** Sorteia quais ofertas de bola extra são grátis (uma flag por bola extra do plano). */
+export function rollFree(count: number, rng: Rng): boolean[] {
+  return Array.from({ length: count }, () => rng() < DIRECTOR_PARAMS.chanceGratis);
+}
 
 function activeIdx(active: boolean[]): number[] {
   const out: number[] = [];
@@ -141,14 +165,18 @@ function otherCaps(
   chance: number,
   rng: Rng,
 ): void {
-  const w = DIRECTOR_PARAMS.pesosNivel;
+  const w = tierWeights();
+  const t = tiers();
   for (const j of idx) {
     if (j === focus || rng() >= chance) continue;
     const ws = w.map((x, k) => (k === 0 || k > maxLevel ? 0 : x));
     if (ws.every((x) => x === 0)) continue;
-    caps[j] = TIERS[weightedIndex(ws, rng)];
+    caps[j] = t[weightedIndex(ws, rng)];
   }
 }
+
+/** Nas rodadas de bingo/quase-bingo as demais cartelas ganham no máximo o nível 1 (linha) ou 2 (cantos, no variado). */
+const small = () => (getPatternSet() === 'classico' ? 1 : 2);
 
 export function sampleTarget(
   active: boolean[],
@@ -164,26 +192,27 @@ export function sampleTarget(
   if (wantBingo) {
     caps[focus] = 'bingo';
     // nas rodadas de bingo, as demais cartelas ganham no máximo algo bem pequeno
-    otherCaps(caps, focus, idx, 2, 0.15, rng);
+    otherCaps(caps, focus, idx, small(), 0.15, rng);
     return {
       maxPattern: caps,
       bingo: { at: rng() < TUNING.chanceBingoNaExtra ? 'extra' : 'main' },
       focus,
     };
   }
-  if (rng() < TUNING.taxaQuaseBingo) {
-    otherCaps(caps, focus, idx, 2, 0.15, rng);
+  if (rng() < P.taxaQuaseBingo) {
+    otherCaps(caps, focus, idx, small(), 0.15, rng);
     return { maxPattern: caps, almost: true, focus };
   }
 
-  const tier = weightedIndex(P.pesosNivel, rng);
-  caps[focus] = TIERS[tier];
+  const t = tiers();
+  const tier = weightedIndex(tierWeights(), rng);
+  caps[focus] = t[tier];
   otherCaps(caps, focus, idx, tier, P.chanceOutraCartela, rng);
   let extra: ExtraMode;
   const r = rng();
   if (tier === 0) extra = r < P.missSemPremio ? 'miss' : 'none';
   else if (r < P.hitComPremio) extra = 'hit';
-  else if (r < P.hitComPremio + P.missComPremio && tier <= 4) extra = 'miss'; // 'miss' em padrão alto vira quase-bingo caro
+  else if (r < P.hitComPremio + P.missComPremio && tier < t.length - 1) extra = 'miss'; // 'miss' em padrão alto vira quase-bingo caro
   else extra = 'none';
   return { maxPattern: caps, extra, focus };
 }
@@ -202,5 +231,6 @@ export function planRound(input: PlanRoundInput): { plan: DrawPlan; intendedBing
   const wantBingo = rng() < bingoChance(director, now);
   const target = sampleTarget(active, wantBingo, rng);
   const built = buildPlanDetailed(cards, active, target, rng);
-  return { plan: built.plan, intendedBingo: !!built.target.bingo && built.validated };
+  const plan: DrawPlan = { ...built.plan, free: rollFree(built.plan.extras.length, rng) };
+  return { plan, intendedBingo: !!built.target.bingo && built.validated };
 }

@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "simulate": "tsx scripts/simulate.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "audio:preview": "tsx scripts/audio/preview.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

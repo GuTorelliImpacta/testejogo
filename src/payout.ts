@@ -1,10 +1,61 @@
 import type { Card, PatternId } from './types';
-import { MULTIPLIER, JACKPOT_BASE, JACKPOT_GROWTH } from './config';
+import { MULTIPLIER, JACKPOT_BASE, JACKPOT_GROWTH, jackpotShare, activePatterns } from './config';
 import { bestPattern, bestReachableByOne } from './patterns';
 import { markedMask } from './cards';
 
 export function prizeFor(pattern: PatternId | null, bet: number): number {
-  return pattern ? bet * MULTIPLIER[pattern] : 0;
+  if (!pattern || !activePatterns().includes(pattern)) return 0;
+  return bet * MULTIPLIER[pattern];
+}
+
+export { jackpotShare };
+
+/** Valor pago do acumulado: floor(acumulado × parcela da aposta). */
+export function jackpotPayout(jackpot: number, bet: number): number {
+  return Math.floor(jackpot * jackpotShare(bet));
+}
+
+/** Prêmios dos padrões ativos para a aposta por cartela (ordem crescente). */
+export function prizeTable(bet: number): { pattern: PatternId; prize: number }[] {
+  return activePatterns().map((pattern) => ({ pattern, prize: prizeFor(pattern, bet) }));
+}
+
+export interface Improve {
+  cardIndex: number;
+  pattern: PatternId;
+  gain: number;
+}
+
+/** Por cartela ativa: melhor padrão alcançável com 1 número e o ganho (prêmio novo − atual). */
+export function extraImproves(
+  cards: Card[],
+  active: boolean[],
+  drawn: ReadonlySet<number>,
+  bet: number,
+): Improve[] {
+  const out: Improve[] = [];
+  cards.forEach((card, i) => {
+    if (!active[i]) return;
+    const marked = markedMask(card, drawn);
+    const next = bestReachableByOne(marked);
+    if (!next) return;
+    const gain = prizeFor(next, bet) - prizeFor(bestPattern(marked), bet);
+    if (gain > 0) out.push({ cardIndex: i, pattern: next, gain });
+  });
+  return out;
+}
+
+/** Custo (ver extraCost) + lista `improves`. cost 0 = sem oferta. */
+export function extraInfo(
+  cards: Card[],
+  active: boolean[],
+  drawn: ReadonlySet<number>,
+  bet: number,
+): { cost: number; improves: Improve[] } {
+  const improves = extraImproves(cards, active, drawn, bet);
+  const maxGain = improves.reduce((m, x) => Math.max(m, x.gain), 0);
+  if (maxGain <= 0) return { cost: 0, improves: [] };
+  return { cost: niceRound(Math.max(1, Math.round(0.08 * maxGain))), improves };
 }
 
 export function nextJackpot(current: number, totalBet: number): number {
@@ -31,16 +82,5 @@ export function extraCost(
   drawn: ReadonlySet<number>,
   bet: number,
 ): number {
-  let maxGain = 0;
-  cards.forEach((card, i) => {
-    if (!active[i]) return;
-    const marked = markedMask(card, drawn);
-    const cur = bestPattern(marked);
-    const next = bestReachableByOne(marked);
-    if (!next) return;
-    const gain = prizeFor(next, bet) - prizeFor(cur, bet);
-    if (gain > maxGain) maxGain = gain;
-  });
-  if (maxGain <= 0) return 0;
-  return niceRound(Math.max(1, Math.round(0.08 * maxGain)));
+  return extraInfo(cards, active, drawn, bet).cost;
 }

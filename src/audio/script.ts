@@ -14,7 +14,10 @@ export type VoiceCategory =
   | 'jackpot'
   | 'extra'
   | 'noprize'
-  | 'gift';
+  | 'gift'
+  | 'bordao'
+  | 'turbo'
+  | 'mail';
 
 /** 1 = comentário, 2 = número, 3 = falta 1, 4 = prêmio, 5 = bingo/acumulado. */
 export const PRIORITY = { comment: 1, number: 2, almost: 3, prize: 4, bingo: 5 } as const;
@@ -39,9 +42,10 @@ const NUM_WORDS: string[] = [
 ];
 const TENS: Record<number, string> = {
   2: 'Vinte', 3: 'Trinta', 4: 'Quarenta', 5: 'Cinquenta', 6: 'Sessenta',
+  7: 'Setenta', 8: 'Oitenta', 9: 'Noventa',
 };
 
-/** 1..60 por extenso, com inicial maiúscula. */
+/** 1..90 por extenso, com inicial maiúscula. */
 export function numberWord(n: number): string {
   if (n < 20) return NUM_WORDS[n];
   const t = Math.floor(n / 10);
@@ -93,6 +97,11 @@ lines.push(
 
   L('extra_1', `Bola extra! Vai, ${PLAYER}!`, 'extra', PRIORITY.comment),
   L('extra_2', 'Mais uma chance!', 'extra', PRIORITY.comment),
+  L('extra_free', 'Bola extra grátis!', 'extra', PRIORITY.comment, { energy: 'big' }),
+  L('extra_linhadupla', 'Linha dupla, valendo!', 'extra', PRIORITY.comment, { energy: 'big' }),
+
+  L('mail_1', 'Correio da sorte!', 'mail', PRIORITY.comment),
+  L('turbo_1', 'Turbo!', 'turbo', PRIORITY.comment, { energy: 'big' }),
 
   L('noprize_1', 'Na próxima vai!', 'noprize', PRIORITY.comment),
   L('noprize_2', 'Quase, quase!', 'noprize', PRIORITY.comment),
@@ -133,6 +142,31 @@ lines.push(
   L('jackpot_2', `ACUMULADO! Parabéns, ${PLAYER}!`, 'jackpot', PRIORITY.bingo, { energy: 'big' }),
 );
 
+/**
+ * Bordões tradicionais do bingo brasileiro (domínio público: ditos populares, sem autoria).
+ * Só entram os muito conhecidos; na dúvida, fica de fora. Cada um ainda diz o número.
+ * Uso: ~1 em cada 8 bolas que têm bordão (ver `pickNumberLine`), se `Settings.bordoes` estiver ligado.
+ */
+export const BORDOES: Readonly<Record<number, string>> = {
+  15: 'Quinze, a debutante!',
+  22: 'Dois patinhos na lagoa! Vinte e dois!',
+  33: 'Trinta e três, idade de Cristo!',
+  77: 'Setenta e sete, dois machadinhos!',
+  90: 'Noventa, o velhinho!',
+};
+/** Chance de usar o bordão quando a bola tem um. */
+export const BORDAO_CHANCE = 1 / 8;
+export const bordaoId = (n: number): string => `bordao_${String(n).padStart(2, '0')}`;
+for (const [n, text] of Object.entries(BORDOES)) {
+  lines.push(L(bordaoId(Number(n)), text, 'bordao', PRIORITY.number));
+}
+
+/** Escolhe a fala de uma bola: número simples ou (às vezes) o bordão. */
+export function pickNumberLine(ball: number, bordoes: boolean, rnd: () => number = Math.random): string {
+  if (bordoes && BORDOES[ball] && rnd() < BORDAO_CHANCE) return bordaoId(ball);
+  return numberId(ball);
+}
+
 export const VOICE_LINES: readonly VoiceLine[] = lines;
 export const LINE_BY_ID: ReadonlyMap<string, VoiceLine> = new Map(lines.map((l) => [l.id, l]));
 
@@ -147,6 +181,10 @@ export const GROUPS = {
   almost: ['almost_1', 'almost_2'],
   almostBingo: ['almost_bingo_1', 'almost_bingo_2'],
   extraOffer: ['extra_1'],
+  extraFree: ['extra_free'],
+  extraLinhaDupla: ['extra_linhadupla'],
+  mail: ['mail_1'],
+  turbo: ['turbo_1'],
   extraBought: ['extra_2'],
   noprize: groupIds('noprize_'),
   gift: ['gift_1', 'gift_2'],
@@ -156,7 +194,11 @@ export const GROUPS = {
 /** Ordem de pré-carregamento: o que toca primeiro vem primeiro; números por último. */
 export function preloadOrder(): string[] {
   const rank = (l: VoiceLine) =>
-    l.category === 'greeting' || l.category === 'start' ? 0 : l.category === 'number' ? 3 : 1;
+    l.category === 'greeting' || l.category === 'start'
+      ? 0
+      : l.category === 'number' || l.category === 'bordao'
+        ? 3
+        : 1;
   return [...lines].sort((a, b) => rank(a) - rank(b)).map((l) => l.id);
 }
 

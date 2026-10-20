@@ -2,35 +2,42 @@ import { bus } from './events';
 import {
   ADMIN_PIN,
   BET_OPTIONS,
-  DAILY_BONUS,
   GIFT_AMOUNT,
   GIFT_THRESHOLD,
   JACKPOT_BASE,
+  MAIL,
   SPEED_MS,
   START_CREDITS,
+  TURBO_MS,
+  getPatternSet,
+  setPatternSet,
+  type PatternSetName,
 } from './config';
 import { generateCards } from './cards';
 import { cryptoRng } from './rng';
 import { RoundSession, type Step } from './round';
-import { nextJackpot, prizeFor } from './payout';
+import { nextJackpot, prizeFor, prizeTable } from './payout';
 import { levelOf } from './patterns';
 import { planRound, afterRound } from './director';
-import { load, migrate, save, saveNow, emptyStats } from './storage';
+import { load, migrate, save, saveNow, emptyStats, emptyMail } from './storage';
 import type { GameApi, GameView } from './gameApi';
 import type { GamePhase, RoundSummary, SaveData, Settings } from './types';
-import { BALLS_MAIN } from './types';
+import { BALLS_EXTRA_MAX, BALLS_MAIN } from './types';
+import { jackpotShare } from './config';
 
 /** Interface mínima de áudio usada pelo jogo (implementada por src/audio). */
 export interface AudioPort {
-  unlock(): void;
-  greet(hour: number): void;
+  unlock(): void | Promise<void>;
+  greet(hour: number): void | Promise<void>;
   waitForSpeech(): Promise<void>;
   setFast(fast: boolean): void;
   setMode(mode: 'calm' | 'lively'): void;
   setVolumes(v: { music: number; voice: number; sfx: number; muted: boolean }): void;
+  setBordoes?(on: boolean): void;
 }
 
 const LEVEL_CELEBRATE = levelOf('linhaDupla');
+const PATTERN_SET_KEY = 'altina-da-sorte:patternSet';
 
 function dayKey(t: number): string {
   const d = new Date(t);
@@ -44,23 +51,34 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
   let drawn: number[] = [];
   let current: number | null = null;
   let summary: RoundSummary | null = null;
-  let extraOffer: { cost: number; remaining: number } | null = null;
+  let extraOffer: GameView['extraOffer'] = null;
   let auto = false;
-  let fast = false;
+  let fast = false; // Turbo ligado (ou rodada acelerada)
   let giftAmount = 0;
+  let mailOpen = false;
+  let roundStartedAt = 0;
   let runId = 0; // invalida laços antigos
   let wake: (() => void) | null = null;
   let unlockedAdmin = false;
   let extraResolver: ((buy: boolean) => void) | null = null;
   let celebrationResolver: (() => void) | null = null;
 
+  try {
+    const ps = localStorage.getItem(PATTERN_SET_KEY);
+    if (ps === 'classico' || ps === 'variado') setPatternSet(ps);
+  } catch {
+    /* ignora */
+  }
+
   const activeCount = () => data.active.filter(Boolean).length;
   const totalBet = () => data.bet * activeCount();
   const changed = () => bus.emit('stateChanged');
+  const turbo = () => data.settings.turbo;
 
   function applyAudioSettings(): void {
     const s = data.settings;
     audio.setVolumes({ music: s.volMusic, voice: s.volVoice, sfx: s.volSfx, muted: s.muted });
+    audio.setBordoes?.(s.bordoes);
   }
 
   function persist(round = true): void {
@@ -71,6 +89,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         plan: session.plan,
         mainIdx: session.mainIdx,
         extrasUsed: session.extrasUsed,
+        extraSpent: session.extraSpent,
         cards: session.cards,
         active: session.active,
       };
@@ -92,10 +111,17 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     });
   }
 
-  function emitStep(step: Step): void {
+  function emitStep(step: Step, silent = false): void {
     drawn.push(step.ball);
     current = step.ball;
-    bus.emit('ballDrawn', { ball: step.ball, index: step.index, extra: step.extra, fast });
+    if (silent) return;
+    bus.emit('ballDrawn', {
+      ball: step.ball,
+      index: step.index,
+      total: step.extra ? BALLS_EXTRA_MAX : BALLS_MAIN,
+      extra: step.extra,
+      fast,
+    });
     for (const a of step.almost) bus.emit('almost', a);
     for (const w of step.won) {
       const prize = prizeFor(w.pattern, session ? session.bet : 0);
@@ -113,13 +139,15 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
   async function drawLoop(id: number): Promise<void> {
     const s = session!;
     audio.setMode('lively');
+    fast = turbo();
+    audio.setFast(fast);
     while (!s.mainDone && id === runId) {
       const step = s.nextMain()!;
       emitStep(step);
       persist();
       if (!fast) await audio.waitForSpeech();
       if (id !== runId) return;
-      await sleep(fast ? 90 : SPEED_MS[data.settings.speed]);
+      await sleep(fast ? TURBO_MS : SPEED_MS[data.settings.speed]);
     }
     if (id !== runId) return;
     await extraLoop(id);
@@ -127,16 +155,17 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
   async function extraLoop(id: number): Promise<void> {
     const s = session!;
-    fast = false;
-    audio.setFast(false);
     for (;;) {
       if (id !== runId) return;
-      const cost = s.offerCost();
-      if (!cost) break;
+      const offer = s.offer();
+      if (!offer) break;
+      // Na oferta de extra a voz volta ao normal (mesmo com Turbo); o Turbo continua ligado.
+      audio.setFast(false);
       auto = false; // jogo automático para em qualquer oferta
       phase = 'extraOffer';
-      extraOffer = { cost, remaining: 10 - s.extrasUsed };
+      extraOffer = { cost: offer.cost, free: offer.free, remaining: offer.remaining, improves: offer.improves };
       bus.emit('extraOffer', extraOffer);
+      if (offer.free) bus.emit('freeExtra');
       persist();
       changed();
       const buy = await new Promise<boolean>((res) => (extraResolver = res));
@@ -144,24 +173,22 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       if (id !== runId) return;
       extraOffer = null;
       if (!buy) break;
-      if (data.credits < cost) giveGift(); // créditos infinitos
-      data.credits -= cost;
+      if (data.credits < offer.cost) {
+        data.credits += GIFT_AMOUNT; // créditos infinitos
+        data.stats.recargas++;
+        bus.emit('giftCredits', { amount: GIFT_AMOUNT });
+      }
+      data.credits -= offer.cost;
       phase = 'extraDrawing';
       const r = s.buyExtra();
       if (!r) break;
-      bus.emit('extraBought', { cost, number: r.step.ball });
+      bus.emit('extraBought', { cost: r.cost, number: r.step.ball });
       emitStep(r.step);
       persist();
       await audio.waitForSpeech();
       await sleep(600);
     }
     await settle(id);
-  }
-
-  function giveGift(): void {
-    data.credits += GIFT_AMOUNT;
-    data.stats.recargas++;
-    bus.emit('giftCredits', { amount: GIFT_AMOUNT });
   }
 
   async function settle(id: number): Promise<void> {
@@ -172,7 +199,6 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     summary = sum;
     data.credits += sum.prize;
     if (sum.jackpot > 0) data.jackpot = JACKPOT_BASE;
-    // estatísticas
     const st = data.stats;
     st.rodadas++;
     st.apostadoTotal += sum.totalBet + sum.extraCost;
@@ -184,11 +210,13 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     const dk = dayKey(now());
     st.rodadasPorDia[dk] = (st.rodadasPorDia[dk] ?? 0) + 1;
     for (const r of sum.results) if (r.pattern) st.porPadrao[r.pattern] = (st.porPadrao[r.pattern] ?? 0) + 1;
+    data.turboRounds++;
+    trackPlayTime();
     const hadBingo = sum.results.some((r) => r.pattern === 'bingo');
     data.director = afterRound(data.director, now(), hadBingo);
-    // atualiza prêmios mostrados nos eventos finais
     bus.emit('roundEnd', { summary: sum, won: sum.prize > 0 });
     session = null;
+    audio.setFast(false);
     audio.setMode('calm');
     const big = levelOf(sum.best) >= LEVEL_CELEBRATE;
     if (big) {
@@ -204,6 +232,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       if (id !== runId) return;
     }
     phase = 'idle';
+    maybeBonusMail();
     persist(false);
     saveNow(data);
     changed();
@@ -211,7 +240,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
   }
 
   function maybeAuto(wasBig: boolean): void {
-    if (!auto || wasBig) {
+    if (!auto || wasBig || data.mail.pending) {
       if (wasBig) auto = false;
       return;
     }
@@ -220,14 +249,39 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     }, 900);
   }
 
+  // ---------- correio da sorte ----------
+  function rollMailDay(): void {
+    const today = dayKey(now());
+    if (data.mail.day !== today) data.mail = { ...emptyMail(), day: today, pending: data.mail.pending };
+  }
+
+  function trackPlayTime(): void {
+    rollMailDay();
+    if (roundStartedAt) data.mail.playMs += Math.max(0, now() - roundStartedAt);
+    roundStartedAt = 0;
+  }
+
+  function maybeBonusMail(): void {
+    rollMailDay();
+    const m = data.mail;
+    if (m.pending || m.bonusToday >= MAIL.bonusMaxPerDay) return;
+    if (m.playMs < (m.bonusToday + 1) * MAIL.minPlayMsBeforeBonus) return;
+    if (cryptoRng() > 0.25) return;
+    const steps = (MAIL.bonusMax - MAIL.bonusMin) / 10;
+    const amount = MAIL.bonusMin + 10 * Math.floor(cryptoRng() * (steps + 1));
+    m.bonusToday++;
+    m.pending = { kind: 'bonus', amount };
+    bus.emit('mailbox', { kind: 'bonus', amount, state: 'arrived' });
+  }
+
   function startSession(s: RoundSession): void {
     session = s;
     drawn = [];
     current = null;
     summary = null;
     extraOffer = null;
-    fast = false;
-    audio.setFast(false);
+    fast = turbo();
+    audio.setFast(fast);
     const id = ++runId;
     phase = 'drawing';
     changed();
@@ -236,6 +290,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
   const api: GameApi = {
     getView(): GameView {
+      const mp = data.mail.pending;
       return {
         phase,
         credits: data.credits,
@@ -246,8 +301,15 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         active: data.active,
         drawn,
         current,
-        mainCount: Math.min(BALLS_MAIN, session ? session.mainIdx : drawn.filter((_, i) => i < BALLS_MAIN).length),
+        mainCount: Math.min(BALLS_MAIN, session ? session.mainIdx : drawn.length),
         extraOffer,
+        extraTotal: BALLS_EXTRA_MAX,
+        extrasDrawn: session ? session.extrasUsed : 0,
+        turbo: turbo(),
+        cardCount: activeCount(),
+        prizeTable: prizeTable(data.bet),
+        jackpotShare: jackpotShare(data.bet),
+        mail: mp && phase === 'idle' ? { kind: mp.kind, amount: mp.amount, open: mailOpen } : null,
         summary,
         auto,
         settings: data.settings,
@@ -257,21 +319,18 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
     enter() {
       if (phase !== 'splash') return;
-      audio.unlock();
+      void audio.unlock();
       applyAudioSettings();
       const t = now();
       const today = dayKey(t);
+      void audio.greet(new Date(t).getHours());
       if (data.round) {
         // retoma a rodada exatamente de onde parou
-        const r = data.round;
-        const s = new RoundSession(r.cards, r.active, r.bet, r.jackpot, r.plan);
-        for (let i = 0; i < r.mainIdx; i++) emitSilent(s.nextMain()!);
-        for (let i = 0; i < r.extrasUsed; i++) {
-          // extras já compradas: reaplica sem cobrar de novo
-          emitSilent(s.buyExtra()!.step);
-        }
+        const s = RoundSession.fromSaved(data.round);
+        drawn = [...s.drawn];
+        current = drawn[drawn.length - 1] ?? null;
         session = s;
-        audio.greet(new Date(t).getHours());
+        roundStartedAt = t;
         const id = ++runId;
         if (s.mainDone) {
           phase = 'extraDrawing';
@@ -285,11 +344,10 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         return;
       }
       phase = 'idle';
-      audio.greet(new Date(t).getHours());
-      if (data.lastDailyBonus !== today) {
-        data.lastDailyBonus = today;
-        data.credits += DAILY_BONUS;
-        bus.emit('dailyBonus', { amount: DAILY_BONUS });
+      rollMailDay();
+      if (data.lastDailyBonus !== today && !data.mail.pending) {
+        data.mail.pending = { kind: 'daily', amount: MAIL.dailyAmount };
+        bus.emit('mailbox', { kind: 'daily', amount: MAIL.dailyAmount, state: 'arrived' });
       }
       audio.setMode('calm');
       persist(false);
@@ -298,6 +356,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
     play() {
       if (phase !== 'idle') return;
+      mailOpen = false;
       if (data.credits < totalBet() || data.credits < GIFT_THRESHOLD) {
         phase = 'gift';
         giftAmount = GIFT_AMOUNT;
@@ -317,15 +376,20 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         rng: cryptoRng,
       });
       const s = new RoundSession(data.cards, data.active, data.bet, Math.floor(data.jackpot), plan);
+      roundStartedAt = now();
       bus.emit('roundStart', { bet: data.bet, totalBet: bet });
       startSession(s);
     },
 
-    accelerate() {
-      if (phase !== 'drawing' || fast) return;
-      fast = true;
-      audio.setFast(true);
-      wake?.();
+    setTurbo(on) {
+      data.settings = { ...data.settings, turbo: on };
+      bus.emit('turboChanged', { on });
+      if (phase === 'drawing') {
+        fast = on;
+        audio.setFast(on);
+        if (on) wake?.();
+      }
+      persist(phase !== 'idle');
       changed();
     },
 
@@ -351,13 +415,24 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       changed();
     },
 
-    toggleCard(i) {
-      if (phase !== 'idle') return;
-      const next = data.active.slice();
-      next[i] = !next[i];
-      if (!next.some(Boolean)) return;
-      data.active = next;
+    openMail() {
+      const mp = data.mail.pending;
+      if (phase !== 'idle' || !mp) return;
+      mailOpen = true;
+      bus.emit('mailbox', { kind: mp.kind, amount: mp.amount, state: 'opened' });
+      changed();
+    },
+
+    claimMail() {
+      const mp = data.mail.pending;
+      if (!mp || !mailOpen) return;
+      data.credits += mp.amount;
+      if (mp.kind === 'daily') data.lastDailyBonus = dayKey(now());
+      data.mail.pending = null;
+      mailOpen = false;
+      bus.emit('mailbox', { kind: mp.kind, amount: mp.amount, state: 'claimed' });
       persist(false);
+      saveNow(data);
       changed();
     },
 
@@ -370,7 +445,15 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       changed();
     },
 
-    swapCards() {
+    changeCards(dir) {
+      if (phase !== 'idle') return;
+      const n = Math.max(1, Math.min(4, activeCount() + dir));
+      data.active = [0, 1, 2, 3].map((i) => i < n);
+      persist(false);
+      changed();
+    },
+
+    shuffleCards() {
       if (phase !== 'idle') return;
       data.cards = generateCards(cryptoRng);
       summary = null;
@@ -383,12 +466,19 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     setAuto(on) {
       auto = on;
       changed();
-      if (on && phase === 'idle') api.play();
+      if (on && phase === 'idle' && !data.mail.pending) api.play();
     },
 
     updateSettings(p: Partial<Settings>) {
+      // O modo leve automático (lightManual:false explícito) nunca sobrescreve a escolha manual.
+      if (p.light !== undefined && p.lightManual === undefined) p = { ...p, lightManual: true };
+      if (p.lightManual === false && data.settings.lightManual) {
+        const { light: _l, lightManual: _m, ...rest } = p;
+        p = rest;
+      }
       data.settings = { ...data.settings, ...p };
       applyAudioSettings();
+      if (p.turbo !== undefined) api.setTurbo(p.turbo);
       persist(false);
       changed();
     },
@@ -406,6 +496,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         return {
           credits: data.credits,
           jackpot: Math.floor(data.jackpot),
+          conjuntoDePadroes: getPatternSet(),
           historicoBingos: data.director.historicoBingos.map((t) => new Date(t).toLocaleDateString('pt-BR')),
           bingosPorMes: data.director.bingosPorMes,
           rodadas: st.rodadas,
@@ -445,13 +536,18 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         persist(false);
         changed();
       },
+      setPatternSet(name: PatternSetName) {
+        if (!unlockedAdmin || phase !== 'idle') return;
+        setPatternSet(name);
+        try {
+          localStorage.setItem(PATTERN_SET_KEY, name);
+        } catch {
+          /* ignora */
+        }
+        changed();
+      },
     },
   };
-
-  function emitSilent(step: Step): void {
-    drawn.push(step.ball);
-    current = step.ball;
-  }
 
   applyAudioSettings();
   return api;

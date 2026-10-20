@@ -37,6 +37,9 @@ const DUCK_UP_S = 0.25;
 const DUCK_RELEASE_DELAY_MS = 220;
 const MAX_DECODED = 48;
 const FETCH_CONCURRENCY = 3;
+/** M12: folga sobre a duração do clipe, e limite para a decodificação. */
+const CLIP_SLACK_MS = 1500;
+const DECODE_TIMEOUT_MS = 4000;
 
 /** Curva de percepção: 0.4 → ~0.25, 0.7 → ~0.59, 1 → 1. */
 export const volCurve = (v: number): number => Math.pow(Math.min(1, Math.max(0, v)), 1.5);
@@ -132,6 +135,16 @@ export class AudioEngine implements ClipPlayer {
     comp.connect(ctx.destination);
     this.applyVolumes(true);
 
+    // M12: se o sistema suspender o contexto (ligação, outro app) com a aba visível, tenta retomar
+    try {
+      ctx.onstatechange = () => {
+        const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+        if (!this.disposed && this.ctx === ctx && ctx.state === 'suspended' && !hidden) void ctx.resume().catch(() => {});
+      };
+    } catch {
+      /* ignora */
+    }
+
     this.exts = canPlayWebmOpus() ? ['webm', 'mp3'] : ['mp3'];
     if (typeof document !== 'undefined') {
       this.visHandler = () => {
@@ -212,6 +225,12 @@ export class AudioEngine implements ClipPlayer {
     if (this.disposed || !this.fetchFn) return;
     if (!this.manifestP) this.manifestP = this.loadManifests();
     void this.manifestP.then(() => {
+      // M4: sem nenhum manifest não há clipes publicados: nada de sondar ~400 URLs (cai no speechSynthesis)
+      if (this.manifests && !this.manifests.gen && !this.manifests.custom) {
+        for (const id of this.queue) this.missing.add(id);
+        this.queue.length = 0;
+        return;
+      }
       while (this.inflight < FETCH_CONCURRENCY && this.queue.length) {
         const id = this.queue.shift()!;
         this.inflight++;
@@ -260,13 +279,12 @@ export class AudioEngine implements ClipPlayer {
 
   private candidates(id: string): string[] {
     const out: string[] = [];
+    // pasta sem manifest = pasta sem clipes (nunca sondar). O manifest lista só o que existe.
     const add = (dir: string, m: Map<string, string[]> | null) => {
-      if (m) {
-        if (!m.has(id)) return;
-        const files = m.get(id)!;
-        if (files.length) files.forEach((f) => out.push(`${this.base}/${dir}/${f}`));
-        else this.exts.forEach((e) => out.push(`${this.base}/${dir}/${id}.${e}`));
-      } else this.exts.forEach((e) => out.push(`${this.base}/${dir}/${id}.${e}`));
+      if (!m || !m.has(id)) return;
+      const files = m.get(id)!;
+      if (files.length) files.forEach((f) => out.push(`${this.base}/${dir}/${f}`));
+      else this.exts.forEach((e) => out.push(`${this.base}/${dir}/${id}.${e}`));
     };
     add('voice-custom', this.manifests?.custom ?? null); // gravações da família vencem
     add('voice', this.manifests?.gen ?? null);
@@ -351,15 +369,29 @@ export class AudioEngine implements ClipPlayer {
     let stopped = false;
     let finished = false;
     let src: AudioBufferSourceNode | null = null;
+    let safety: ReturnType<typeof setTimeout> | undefined;
     let resolve!: () => void;
     const done = new Promise<void>((r) => (resolve = r));
     const end = () => {
       if (finished) return;
       finished = true;
+      clearTimeout(safety);
       resolve();
     };
+    const stop = () => {
+      stopped = true;
+      try {
+        src?.stop();
+      } catch {
+        /* ok */
+      }
+      end();
+    };
+    // M12: contexto suspenso não avança o relógio → o clipe nunca "termina". Tenta retomar e arma um limite.
+    if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
+    safety = setTimeout(stop, DECODE_TIMEOUT_MS);
     void this.decode(id).then((buf) => {
-      if (stopped || !buf) return end();
+      if (stopped || finished || !buf) return end();
       src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(this.voiceBus);
@@ -371,20 +403,12 @@ export class AudioEngine implements ClipPlayer {
         }
         end();
       };
+      clearTimeout(safety);
+      safety = setTimeout(stop, buf.duration * 1000 + CLIP_SLACK_MS);
+      if (ctx.state === 'suspended') void ctx.resume().catch(() => {});
       src.start();
     });
-    return {
-      done,
-      stop: () => {
-        stopped = true;
-        try {
-          src?.stop();
-        } catch {
-          /* ok */
-        }
-        end();
-      },
-    };
+    return { done, stop };
   }
 
   dispose(): void {

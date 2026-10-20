@@ -1,22 +1,44 @@
-/* Simulador do Diretor: `npm run simulate [-- --seeds N --days D]`.
- * Política da jogadora: compra toda bola extra oferecida (se tiver saldo), aposta 5 x 4 cartelas,
- * saldo inicial 1000, presente de 1000 quando saldo < 50 ou < aposta total. */
+/* Simulador do Diretor: `npm run simulate [-- --seeds N --days D --profile R --set classico|variado]`.
+ *
+ * Política da jogadora: compra toda bola extra oferecida (as grátis sempre; as pagas se tiver saldo),
+ * saldo inicial 1000, presente de 1000 quando saldo < 50 ou < aposta total, 4 cartelas, cartelas novas
+ * ("Números") a cada 8 rodadas. Perfis de 10/40/120 rodadas por dia, 90 dias, 30 seeds.
+ *
+ * Definições (explícitas):
+ *   apostas        = soma das apostas das cartelas (aposta x cartelas ativas) de todas as rodadas;
+ *   extras pagas   = soma do custo das bolas extras NÃO grátis;
+ *   prêmios comuns = prêmios por cartela (Linha, Linha dupla...), exceto Bingo e Acumulado;
+ *   RTP comuns     = prêmios comuns / (apostas + extras pagas)   <- meta ~0,88;
+ *   oferta         = cada vez que o jogo oferece a próxima bola extra; grátis = oferta com plan.free;
+ *   "com Linha"    = rodada em que pelo menos uma cartela termina com Linha como melhor padrão.
+ */
 import type { PatternId, DirectorState } from '../src/types';
 import { PATTERN_ORDER } from '../src/types';
-import { START_CREDITS, GIFT_AMOUNT, GIFT_THRESHOLD, JACKPOT_BASE, TUNING } from '../src/config';
+import {
+  START_CREDITS, GIFT_AMOUNT, GIFT_THRESHOLD, JACKPOT_BASE, TUNING, jackpotShare,
+  setPatternSet, activePatterns,
+} from '../src/config';
+import type { PatternSetName } from '../src/config';
 import { seededRng } from '../src/rng';
 import { generateCards } from '../src/cards';
 import { RoundSession } from '../src/round';
 import { nextJackpot } from '../src/payout';
 import { DAY_MS, afterRound, initialDirector, monthKey, planRound } from '../src/director';
 
-declare const process: { argv: string[] };
+declare const process: { argv: string[]; exitCode?: number };
 function arg(name: string, def: number): number {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? Number(process.argv[i + 1]) : def;
 }
-const BET = 5;
+function argStr(name: string, def: string): string {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? process.argv[i + 1] : def;
+}
+const SET = argStr('set', 'classico') as PatternSetName;
+setPatternSet(SET);
+const BET = arg('bet', 5);
 const ACTIVE = [true, true, true, true];
+const NCARDS = ACTIVE.length;
 const ONLY = arg('profile', 0);
 const PROFILES = ONLY ? [ONLY] : [10, 40, 120];
 
@@ -26,15 +48,20 @@ const START = new Date(2026, 9, 20, 9, 0, 0).getTime(); // 20/10/2026
 const END = START + DAYS * DAY_MS;
 
 interface Run {
+  bet: number;
   rounds: number;
   bets: number;
   common: number;
-  bingoPrize: number;
-  extraCost: number;
-  offers: number;
+  bingoPrize: number; // Bingo (cartela) + Acumulado
+  extraPaid: number;
+  offersRounds: number; // rodadas com pelo menos uma oferta
+  offers: number; // ofertas (cada bola extra oferecida)
+  freeOffers: number;
   roundsWithBingo: number;
   perCard: Partial<Record<PatternId, number>>;
   perRoundBest: Partial<Record<PatternId, number>>;
+  roundsWithLinha: number; // >= 1 cartela com Linha como melhor padrão
+  roundsWithDupla: number; // >= 1 cartela com Linha dupla
   noPrize: number;
   recargas: number;
   minCredits: number;
@@ -43,62 +70,78 @@ interface Run {
   bingoTimes: number[];
   months: Record<string, number>;
   jackpotsPaid: number;
+  jackpotSum: number;
+  bingoMain: number;
+  bingoExtra: number;
 }
 
-function runOne(rpd: number, seed: number): Run {
-  const rng = seededRng(seed * 7919 + rpd * 104729 + 17);
+function runOne(rpd: number, seed: number, bet: number): Run {
+  const rng = seededRng(seed * 7919 + rpd * 104729 + bet * 31 + 17);
   let director: DirectorState = initialDirector(START);
   let credits = START_CREDITS;
   let jackpot = JACKPOT_BASE;
   const run: Run = {
-    rounds: 0, bets: 0, common: 0, bingoPrize: 0, extraCost: 0, offers: 0, roundsWithBingo: 0,
-    perCard: {}, perRoundBest: {}, noPrize: 0, recargas: 0, minCredits: credits, finalCredits: credits,
-    weekly: [], bingoTimes: [], months: {}, jackpotsPaid: 0,
+    bet, rounds: 0, bets: 0, common: 0, bingoPrize: 0, extraPaid: 0, offersRounds: 0, offers: 0, freeOffers: 0,
+    roundsWithBingo: 0, perCard: {}, perRoundBest: {}, roundsWithLinha: 0, roundsWithDupla: 0, noPrize: 0,
+    recargas: 0, minCredits: credits, finalCredits: credits, weekly: [], bingoTimes: [], months: {},
+    jackpotsPaid: 0, jackpotSum: 0, bingoMain: 0, bingoExtra: 0,
   };
   let cards = generateCards(rng);
   for (let day = 0; day < DAYS; day++) {
     for (let r = 0; r < rpd; r++) {
       const now = START + day * DAY_MS + Math.floor(((r + 0.5) / rpd) * 12 * 3_600_000);
       if (run.rounds % 8 === 0) cards = generateCards(rng);
-      const totalBet = BET * ACTIVE.length;
+      const totalBet = bet * NCARDS;
       if (credits < GIFT_THRESHOLD || credits < totalBet) {
         credits += GIFT_AMOUNT;
         run.recargas++;
       }
       credits -= totalBet;
-      const { plan } = planRound({ cards, active: ACTIVE, bet: BET, now, director, rng });
-      const s = new RoundSession(cards, ACTIVE, BET, jackpot, plan);
+      const { plan } = planRound({ cards, active: ACTIVE, bet, now, director, rng });
+      const s = new RoundSession(cards, ACTIVE, bet, jackpot, plan);
       while (s.nextMain()) { /* 30 bolas */ }
-      let cost = s.offerCost();
-      if (cost > 0) run.offers++;
-      while (cost > 0 && cost <= credits) {
-        credits -= cost;
+      let offeredRound = false;
+      for (let o = s.offer(); o; o = s.offer()) {
+        if (!o.free && o.cost > credits) break; // sem saldo: termina
+        offeredRound = true;
+        run.offers++;
+        if (o.free) run.freeOffers++;
+        credits -= o.cost;
         s.buyExtra();
-        cost = s.offerCost();
       }
+      if (offeredRound) run.offersRounds++;
       const sum = s.finish();
       credits += sum.prize;
       run.rounds++;
       run.bets += totalBet;
-      run.extraCost += sum.extraCost;
+      run.extraPaid += sum.extraCost;
       let hadBingo = false;
       let common = 0;
+      let linha = false;
+      let dupla = false;
       for (const res of sum.results) {
         if (res.pattern) run.perCard[res.pattern] = (run.perCard[res.pattern] ?? 0) + 1;
         if (res.pattern === 'bingo') hadBingo = true;
         else common += res.prize;
+        if (res.pattern === 'linha') linha = true;
+        if (res.pattern === 'linhaDupla') dupla = true;
       }
+      if (linha) run.roundsWithLinha++;
+      if (dupla) run.roundsWithDupla++;
       run.common += common;
       run.bingoPrize += sum.prize - common;
       if (sum.best) run.perRoundBest[sum.best] = (run.perRoundBest[sum.best] ?? 0) + 1;
       else run.noPrize++;
       if (sum.jackpot > 0) {
         run.jackpotsPaid++;
+        run.jackpotSum += sum.jackpot;
         jackpot = JACKPOT_BASE;
       } else {
         jackpot = nextJackpot(jackpot, totalBet);
       }
       if (hadBingo) {
+        if (sum.jackpot > 0) run.bingoMain++;
+        else run.bingoExtra++;
         run.roundsWithBingo++;
         run.bingoTimes.push(now);
         const k = monthKey(now);
@@ -132,19 +175,27 @@ function monthsCovered(): { key: string; full: boolean }[] {
 
 const f = (x: number, d = 2) => x.toFixed(d);
 const pct = (x: number, d = 1) => `${(100 * x).toFixed(d)}%`;
-const names: (PatternId)[] = PATTERN_ORDER;
+const inRange = (x: number, lo: number, hi: number) => x >= lo && x <= hi;
+const names: PatternId[] = PATTERN_ORDER.filter((p) => activePatterns().includes(p));
+let metaFalhas = 0;
+function meta(label: string, value: number, lo: number, hi: number, asPct = true): void {
+  const ok = inRange(value, lo, hi);
+  if (!ok) metaFalhas++;
+  const fmt = (x: number) => (asPct ? pct(x) : f(x, 3));
+  console.log(`  [${ok ? 'OK ' : 'FORA'}] ${label}: ${fmt(value)} (meta ${fmt(lo)}-${fmt(hi)})`);
+}
 
-console.log(`Simulação: ${DAYS} dias a partir de ${new Date(START).toLocaleDateString('pt-BR')}, aposta ${BET} x ${ACTIVE.length} cartelas, ${SEEDS} seeds por perfil`);
-console.log(`Metas: ${TUNING.bingoPorMesAlvo} bingos/mês (máx ${TUNING.bingoMaxPorMes}), mín ${TUNING.diasMinEntreBingos} dias entre bingos, RTP comuns alvo ${TUNING.rtpAlvo}\n`);
+console.log(`Simulação: ${DAYS} dias a partir de ${new Date(START).toLocaleDateString('pt-BR')}, conjunto '${SET}' (${activePatterns().join(', ')}), aposta ${BET} x ${NCARDS} cartelas, ${SEEDS} seeds por perfil`);
+console.log(`Metas: ${TUNING.bingoPorMesAlvo} bingos/mês (máx ${TUNING.bingoMaxPorMes}), mín ${TUNING.diasMinEntreBingos} dias entre bingos, RTP comuns alvo ${TUNING.rtpAlvo} (= prêmios comuns / (apostas + extras pagas))\n`);
 
 const cov = monthsCovered();
 let violations = 0;
 
 for (const rpd of PROFILES) {
   const runs: Run[] = [];
-  for (let s = 1; s <= SEEDS; s++) runs.push(runOne(rpd, s));
+  for (let s = 1; s <= SEEDS; s++) runs.push(runOne(rpd, s, BET));
   const sum = (fn: (r: Run) => number) => runs.reduce((a, r) => a + fn(r), 0);
-  console.log(`=== Perfil ${rpd} rodadas/dia ===`);
+  console.log(`=== Perfil ${rpd} rodadas/dia (aposta ${BET}) ===`);
 
   // meses
   const hist: Record<string, number[]> = {};
@@ -176,21 +227,37 @@ for (const rpd of PROFILES) {
     console.log(`  intervalo entre bingos (dias): média ${f(mean, 1)}, mín ${f(sorted[0], 1)}, mediana ${f(sorted[Math.floor(sorted.length / 2)], 1)}, máx ${f(sorted[sorted.length - 1], 1)}`);
     if (sorted[0] < TUNING.diasMinEntreBingos - 1e-9) { console.log('  !! intervalo abaixo do mínimo'); violations++; }
   }
-  console.log(`  primeiro bingo (dias após primeiro uso): média ${f(firsts.reduce((a, b) => a + b, 0) / firsts.length, 1)}, máx ${f(Math.max(...firsts), 1)}`);
-  console.log(`  bingos em ${DAYS} dias por seed: média ${f(sum((r) => r.bingoTimes.length) / runs.length)}, jackpots pagos/seed: ${f(sum((r) => r.jackpotsPaid) / runs.length)}`);
+  const fMin = Math.min(...firsts);
+  const fMax = Math.max(...firsts);
+  console.log(`  primeiro bingo (dias após primeiro uso): média ${f(firsts.reduce((a, b) => a + b, 0) / firsts.length, 1)}, mín ${f(fMin, 1)}, máx ${f(fMax, 1)} (meta: entre o 3º e o 10º dia => 2 a 10 dias decorridos)`);
+  if (fMin < 2 || fMax > 10) { console.log('  !! primeiro bingo fora da janela'); violations++; }
+  console.log(`  bingos em ${DAYS} dias por seed: média ${f(sum((r) => r.bingoTimes.length) / runs.length)} (na principal/acumulado ${f(sum((r) => r.bingoMain) / runs.length)}, via extra ${f(sum((r) => r.bingoExtra) / runs.length)})`);
 
-  // RTP
+  const rounds = sum((r) => r.rounds);
   const bets = sum((r) => r.bets);
   const common = sum((r) => r.common);
   const bingo = sum((r) => r.bingoPrize);
-  const extra = sum((r) => r.extraCost);
-  console.log(`  RTP comuns (prêmios comuns / apostas): ${f(common / bets, 3)} | líquido do custo das extras (/ apostas+extras): ${f(common / (bets + extra), 3)}`);
-  console.log(`  RTP total (com bingo e acumulado / apostas): ${f((common + bingo) / bets, 3)} | custo médio de extras por rodada: ${f(extra / sum((r) => r.rounds), 2)} (aposta ${BET * 4})`);
-  const rounds = sum((r) => r.rounds);
-  console.log(`  rodadas com oferta de bola extra: ${pct(sum((r) => r.offers) / rounds)} | rodadas sem prêmio: ${pct(sum((r) => r.noPrize) / rounds)}`);
+  const extra = sum((r) => r.extraPaid);
+
+  // metas da v2
+  meta('rodadas sem prêmio', sum((r) => r.noPrize) / rounds, 0.55, 0.62);
+  meta('rodadas com >= 1 Linha', sum((r) => r.roundsWithLinha) / rounds, 0.30, 0.38);
+  meta('rodadas com Linha dupla', sum((r) => r.roundsWithDupla) / rounds, 0.05, 0.08);
+  meta('rodadas com oferta de bola extra', sum((r) => r.offersRounds) / rounds, 0.25, 0.35);
+  meta('bola grátis / ofertas', sum((r) => r.freeOffers) / Math.max(1, sum((r) => r.offers)), 0.15, 0.20);
+  meta('RTP comuns / (apostas + extras pagas)', common / (bets + extra), 0.85, 0.91, false);
+  const rec = runs.map((r) => r.recargas);
+  const recMean = rec.reduce((a, b) => a + b, 0) / rec.length;
+  const recOk = rpd < 120 || recMean <= 20;
+  if (!recOk) metaFalhas++;
+  console.log(`  [${recOk ? 'OK ' : 'FORA'}] recargas de presente em ${DAYS} dias: média ${f(recMean, 1)}, máx ${Math.max(...rec)}${rpd >= 120 ? ' (meta <= ~20)' : ''}`);
+
+  console.log(`  RTP comuns / apostas (sem somar extras): ${f(common / bets, 3)} | RTP total (comuns + bingo + acumulado) / (apostas + extras): ${f((common + bingo) / (bets + extra), 3)}`);
+  console.log(`  extras: ${f(sum((r) => r.offers) / rounds, 2)} ofertas/rodada; custo pago médio ${f(extra / rounds, 2)} por rodada (apostas ${BET * NCARDS}); grátis ${sum((r) => r.freeOffers)} de ${sum((r) => r.offers)}`);
+  console.log(`  acumulado pago por seed: ${f(sum((r) => r.jackpotsPaid) / runs.length)} vezes, média ${f(sum((r) => r.jackpotSum) / Math.max(1, sum((r) => r.jackpotsPaid)), 0)} créditos (parcela da aposta ${BET}: ${jackpotShare(BET) * 100}%)`);
 
   // padrões
-  const pc = names.map((p) => `${p} ${pct(sum((r) => r.perCard[p] ?? 0) / (rounds * 4), 2)}`).join(' | ');
+  const pc = names.map((p) => `${p} ${pct(sum((r) => r.perCard[p] ?? 0) / (rounds * NCARDS), 2)}`).join(' | ');
   console.log(`  frequência por cartela: ${pc}`);
   const pr = names.map((p) => `${p} ${pct(sum((r) => r.perRoundBest[p] ?? 0) / rounds, 2)}`).join(' | ');
   console.log(`  melhor padrão da rodada: ${pr}`);
@@ -199,7 +266,34 @@ for (const rpd of PROFILES) {
   const wk = (i: number) => f(runs.reduce((a, r) => a + (r.weekly[i] ?? 0), 0) / runs.length, 0);
   const weeks = [0, 2, 4, 8, runs[0].weekly.length - 1].filter((v, i, a) => a.indexOf(v) === i && v < runs[0].weekly.length);
   console.log(`  saldo médio ao fim das semanas ${weeks.map((w) => w + 1).join(', ')}: ${weeks.map(wk).join(' | ')}`);
-  console.log(`  saldo final médio ${f(sum((r) => r.finalCredits) / runs.length, 0)} (mín visto ${f(Math.min(...runs.map((r) => r.minCredits)), 0)}); recargas por seed: média ${f(sum((r) => r.recargas) / runs.length, 1)}, máx ${Math.max(...runs.map((r) => r.recargas))}\n`);
+  console.log(`  saldo final médio ${f(sum((r) => r.finalCredits) / runs.length, 0)} (mín visto ${f(Math.min(...runs.map((r) => r.minCredits)), 0)}); recargas por seed: média ${f(recMean, 1)}, máx ${Math.max(...rec)}\n`);
 }
 
-console.log(violations === 0 ? 'OK: nenhum mês completo com 0 bingos, nenhum mês com 4+, nenhum intervalo < mínimo.' : `ATENÇÃO: ${violations} violação(ões) (0 em mês completo, 4+ em algum mês ou intervalo curto).`);
+// Acumulado parcial: apostas 1 e 2 (perfil 40/dia)
+if (!argStr('nopartial', '')) {
+  console.log('=== Pagamento parcial do acumulado (perfil 40 rodadas/dia) ===');
+  for (const b of [1, 2]) {
+    const runs: Run[] = [];
+    for (let s = 1; s <= SEEDS; s++) runs.push(runOne(40, s, b));
+    const sum = (fn: (r: Run) => number) => runs.reduce((a, r) => a + fn(r), 0);
+    const rounds = sum((r) => r.rounds);
+    const common = sum((r) => r.common);
+    const bets = sum((r) => r.bets);
+    const extra = sum((r) => r.extraPaid);
+    const paid = sum((r) => r.jackpotsPaid);
+    console.log(
+      `  aposta ${b} (parcela ${jackpotShare(b) * 100}%): bingos/seed ${f(sum((r) => r.roundsWithBingo) / runs.length)}, ` +
+      `acumulado pago ${f(paid / runs.length)}x/seed (parcial em ${paid ? '100' : '0'}% dos pagamentos), média ${f(sum((r) => r.jackpotSum) / Math.max(1, paid), 0)} créditos; ` +
+      `${pct(paid / Math.max(1, sum((r) => r.roundsWithBingo)))} dos bingos foram na principal; ` +
+      `RTP comuns ${f(common / (bets + extra), 3)}; sem prêmio ${pct(sum((r) => r.noPrize) / rounds)}; recargas/seed ${f(sum((r) => r.recargas) / runs.length, 1)}`,
+    );
+  }
+  console.log('');
+}
+
+const fail = violations + metaFalhas;
+console.log(
+  fail === 0
+    ? 'OK: todas as metas atendidas.'
+    : `ATENÇÃO: ${violations} violação(ões) do bingo (0 em mês completo, 4+ em algum mês, intervalo curto, janela do 1º bingo) e ${metaFalhas} meta(s) da v2 fora da faixa.`,
+);

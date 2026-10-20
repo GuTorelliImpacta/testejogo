@@ -46,6 +46,15 @@ interface Item {
   finished: boolean;
 }
 
+/** Categorias que o modo acelerado/Turbo não narra. */
+const SUPPRESSED_WHEN_FAST: ReadonlySet<VoiceLine['category']> = new Set(['number', 'bordao', 'almost']);
+
+/** True se o modo acelerado cala esta fala (para o áudio não tocar o efeito dela). */
+export const suppressedWhenFast = (line: VoiceLine): boolean => SUPPRESSED_WHEN_FAST.has(line.category);
+
+/** Rede de segurança: nenhuma fala segura a fila por mais que isto (M12). */
+export const maxSpeechMs = (text: string): number => Math.max(8000, estimateMs(text) * 3);
+
 /** Duração estimada de uma fala sem áudio (só legenda). */
 export const estimateMs = (text: string): number => Math.min(3500, Math.max(500, 350 + text.length * 70));
 
@@ -72,6 +81,7 @@ export class Narrator {
   private fast = false;
   private waiters: Array<() => void> = [];
   private disposed = false;
+  private watchdog: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private o: NarratorOptions) {}
 
@@ -99,7 +109,7 @@ export class Narrator {
     const line = typeof lineOrId === 'string' ? LINE_BY_ID.get(lineOrId) : lineOrId;
     if (!line || this.disposed) return Promise.resolve();
     // modo acelerado: só prêmios (e comentários), nunca número/falta 1
-    if (this.fast && (line.category === 'number' || line.category === 'almost')) return Promise.resolve();
+    if (this.fast && SUPPRESSED_WHEN_FAST.has(line.category)) return Promise.resolve();
     const busy = this.cur !== null || this.queue.length > 0;
     const dropIfBusy = opts.dropIfBusy ?? line.priority <= PRIORITY.comment;
     if (dropIfBusy && busy) return Promise.resolve();
@@ -181,17 +191,29 @@ export class Narrator {
     const wasIdle = this.cur === null;
     this.cur = item;
     if (wasIdle) this.o.onActive?.(true);
-    this.o.onCaption?.(item.line.text);
     const line = item.line;
     let h: SpeechHandle | null = null;
+    // a legenda é exatamente o texto que está sendo dito (clipe = texto do roteiro; voz sintetizada = texto enviado)
+    let caption = line.text;
     if (this.o.isMuted?.()) {
       h = timerHandle(Math.min(estimateMs(line.text) * 0.6, 1200));
     } else {
       if (this.o.clips.has(line.id)) h = this.o.clips.play(line.id);
-      if (!h && this.o.synth) h = this.o.synth.speak(line.speak ?? line.text, this.styleFor(line));
-      if (!h) h = timerHandle(estimateMs(line.text));
+      if (!h && this.o.synth) {
+        caption = line.speak ?? line.text;
+        h = this.o.synth.speak(caption, this.styleFor(line));
+      }
+      if (!h) {
+        caption = line.text;
+        h = timerHandle(estimateMs(line.text));
+      }
     }
+    this.o.onCaption?.(caption);
     item.handle = h;
+    clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => {
+      if (this.cur === item) this.finish(item, true, true);
+    }, maxSpeechMs(line.text));
     void h.done.then(() => {
       if (this.cur === item) this.finish(item, false, true);
     });
@@ -213,7 +235,10 @@ export class Narrator {
     if (item.finished) return;
     item.finished = true;
     if (stop) item.handle?.stop();
-    if (this.cur === item) this.cur = null;
+    if (this.cur === item) {
+      this.cur = null;
+      clearTimeout(this.watchdog);
+    }
     item.resolve();
     if (pumpAfter) this.pump();
   }

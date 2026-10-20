@@ -8,7 +8,7 @@ import type { Volumes } from './engine';
 import { Music } from './music';
 import type { MusicMode } from './music';
 import { Narrator, createSynthSpeaker } from './narrator';
-import { GROUPS, numberId, periodOf, pickVariant, preloadOrder, prizeIds } from './script';
+import { GROUPS, periodOf, pickNumberLine, pickVariant, preloadOrder, prizeIds } from './script';
 import { Sfx } from './sfx';
 
 export type { Volumes } from './engine';
@@ -25,6 +25,8 @@ export interface AudioApi {
   getVolumes(): Volumes;
   /** Rodada acelerada: narra só os prêmios. */
   setFast(fast: boolean): void;
+  /** Bordões tradicionais de bingo em ~1 de cada 8 bolas que tenham um (padrão: ligado). */
+  setBordoes(on: boolean): void;
   setMode(mode: MusicMode): void;
   /** Legenda da fala atual ('' quando termina). Retorna função para cancelar a assinatura. */
   onCaption(cb: (text: string) => void): () => void;
@@ -35,6 +37,8 @@ export interface AudioApi {
 
 export interface CreateAudioOptions {
   engine?: AudioEngine;
+  /** Aleatoriedade (testes/prévia); padrão Math.random. */
+  rnd?: () => number;
 }
 
 const SMALL: PatternId[] = ['linha', 'cantos'];
@@ -46,7 +50,11 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
   const music = new Music(engine);
   const captionCbs = new Set<(t: string) => void>();
   const last: Record<string, string> = {};
+  const rnd = opts.rnd ?? Math.random;
   let fast = false;
+  let lastBallFast = false;
+  let bordoes = true;
+  let lastFreeAt = -1e9;
   let mode: MusicMode = 'calm';
   let disposed = false;
   let offVis: (() => void) | null = null;
@@ -75,6 +83,15 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
     return !v.muted && v.music > 0.02;
   };
 
+  /** Fala 'Bola extra grátis!' + plim, uma vez só mesmo que freeExtra e extraOffer.free cheguem juntos. */
+  const announceFreeExtra = () => {
+    const now = Date.now();
+    if (now - lastFreeAt < 1500) return;
+    lastFreeAt = now;
+    sfx.plim();
+    void narrator.say(GROUPS.extraFree[0], { preempt: false, dropIfBusy: false });
+  };
+
   const celebrate = (kind: 'win' | 'bingo') => {
     if (musicAudible() && music.stinger(kind)) return;
     if (kind === 'bingo') sfx.bingoFanfare();
@@ -92,7 +109,9 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
     const preempt = narrator.currentCategory !== 'number'; // não corta o número que acabou de sair
     void narrator.say(pick(`prize_${p}`, prizeIds(p)), { preempt, dropIfBusy: false });
     if (p === 'bingo') return; // som do bingo vem do evento `bingo`
-    if (SMALL.includes(p)) sfx.smallWin();
+    if (p === 'linha') sfx.jingleLinha();
+    else if (p === 'linhaDupla') sfx.jingleLinhaDupla();
+    else if (SMALL.includes(p)) sfx.smallWin();
     else celebrate('win');
   };
 
@@ -103,13 +122,19 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
       void narrator.say(pick('start', GROUPS.start));
     }),
     bus.on('ballDrawn', (e) => {
-      if (e.fast || fast) return; // acelerado: só prêmios
+      lastBallFast = e.fast;
+      if (e.fast || fast) {
+        sfx.tick(); // acelerado/Turbo: só um tique, voz só nos prêmios
+        return;
+      }
       sfx.ballDraw();
       // não corta a fala de início ("Valendo!")
-      void narrator.say(numberId(e.ball), { preempt: narrator.currentCategory !== 'start' });
+      void narrator.say(pickNumberLine(e.ball, bordoes, rnd), { preempt: narrator.currentCategory !== 'start' });
     }),
     bus.on('almost', (e) => {
-      sfx.almost();
+      // se a fala é calada (Turbo/acelerado), o efeito dela também
+      const silent = fast || lastBallFast;
+      if (!silent) sfx.almost();
       void narrator.say(pick(e.forBingo ? 'almostB' : 'almost', e.forBingo ? GROUPS.almostBingo : GROUPS.almost), {
         preempt: false,
         expireMs: 2500,
@@ -122,8 +147,25 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
         queueMicrotask(flushWin);
       }
     }),
-    bus.on('extraOffer', () => {
-      void narrator.say(GROUPS.extraOffer[0], { preempt: false, dropIfBusy: false });
+    bus.on('extraOffer', (e) => {
+      if (e.free) {
+        announceFreeExtra();
+        return;
+      }
+      const dupla = e.improves.some((i) => i.pattern === 'linhaDupla');
+      const id = dupla ? GROUPS.extraLinhaDupla[0] : GROUPS.extraOffer[0];
+      void narrator.say(id, { preempt: false, dropIfBusy: false });
+    }),
+    bus.on('freeExtra', announceFreeExtra),
+    bus.on('mailbox', (e) => {
+      if (e.state !== 'arrived') return; // aberta/pega: a UI já tem sons próprios (moedas no presente)
+      sfx.plim();
+      void narrator.say(GROUPS.mail[0], { preempt: false, dropIfBusy: false });
+    }),
+    bus.on('turboChanged', (e) => {
+      fast = e.on;
+      narrator.setFast(e.on);
+      if (e.on) void narrator.say(GROUPS.turbo[0], { preempt: false, dropIfBusy: false });
     }),
     bus.on('extraBought', () => {
       sfx.coins(3);
@@ -141,6 +183,7 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
     bus.on('bingo', () => celebrate('bingo')),
     bus.on('jackpot', () => {
       void narrator.say(pick('jackpot', GROUPS.jackpot), { preempt: false, dropIfBusy: false });
+      sfx.jingleJackpot();
       sfx.coins(16);
     }),
     bus.on('giftCredits', () => {
@@ -191,6 +234,9 @@ export function createAudio(bus: Bus, opts: CreateAudioOptions = {}): AudioApi {
     setFast(f) {
       fast = f;
       narrator.setFast(f);
+    },
+    setBordoes(on) {
+      bordoes = on;
     },
     setMode(m) {
       mode = m;

@@ -1,51 +1,73 @@
-// Legendas: mostra em letra grande o que a voz fala. Um unico timeout reutilizado (sem setInterval).
+// Legenda = EXATAMENTE a fala que tocou (M9). A integracao liga `setSpokenCaption` ao `onCaption` do audio.
+// Sem fala ativa mostra o texto de estado padrao. Mensagens visuais nao faladas ('FALTA 1!') usam `flash`.
 import { h, setText } from './dom';
 
 export interface Captions {
   el: HTMLElement;
-  /** prio maior nao e substituida por prio menor enquanto estiver no tempo minimo */
-  show(text: string, prio?: number, ms?: number): void;
+  /** Texto de estado padrao (mostrado quando nao ha fala nem aviso visual). */
+  setState(text: string): void;
+  /** Aviso visual nao falado, por `ms`. Nao sobrescreve fala ativa. */
+  flash(text: string, ms?: number): void;
   setEnabled(on: boolean): void;
   destroy(): void;
 }
 
+const instances = new Set<{ spoken(t: string): void }>();
+
+/** Chamar com o texto de cada fala; texto vazio = fim da fala (volta ao texto de estado). */
+export function setSpokenCaption(text: string): void {
+  for (const c of instances) c.spoken(text);
+}
+
 export function createCaptions(): Captions {
   const el = h('div', 'caption', '', { 'aria-hidden': 'true' });
-  let timer = 0;
-  let curPrio = 0;
-  let holdUntil = 0;
   let enabled = true;
+  let spoken = '';
+  let state = '';
+  let visual = '';
+  let visualTimer = 0;
+  let spokenTimer = 0;
 
-  const clear = () => {
-    el.classList.remove('on', 'hot');
+  const paint = () => {
+    const t = spoken || visual || state;
+    setText(el, enabled ? t : '');
+    el.classList.toggle('on', enabled && !!t);
+    el.classList.toggle('spk', !!spoken);
+    el.classList.toggle('hot', !spoken && !!visual);
   };
+
+  const inst = {
+    spoken(t: string) {
+      spoken = (t ?? '').trim();
+      window.clearTimeout(spokenTimer);
+      // seguranca: se o fim da fala nunca chegar, volta ao estado apos 12 s
+      if (spoken) spokenTimer = window.setTimeout(() => { spoken = ''; paint(); }, 12000);
+      paint();
+    },
+  };
+  instances.add(inst);
 
   return {
     el,
-    show(text, prio = 1, ms = 2200) {
-      if (!enabled) return;
-      const now = performance.now();
-      if (now < holdUntil && prio < curPrio) return;
-      curPrio = prio;
-      holdUntil = now + Math.min(ms, 1400);
-      setText(el, text);
-      el.classList.add('on');
-      el.classList.toggle('hot', prio >= 3);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        curPrio = 0;
-        clear();
-      }, ms);
+    setState(text) {
+      if (text === state) return;
+      state = text;
+      paint();
+    },
+    flash(text, ms = 2200) {
+      visual = text;
+      window.clearTimeout(visualTimer);
+      visualTimer = window.setTimeout(() => { visual = ''; paint(); }, ms);
+      paint();
     },
     setEnabled(on) {
       enabled = on;
-      if (!on) {
-        window.clearTimeout(timer);
-        clear();
-      }
+      paint();
     },
     destroy() {
-      window.clearTimeout(timer);
+      instances.delete(inst);
+      window.clearTimeout(visualTimer);
+      window.clearTimeout(spokenTimer);
     },
   };
 }
