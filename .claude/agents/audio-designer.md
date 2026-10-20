@@ -10,3 +10,6 @@ Você é o designer de áudio. Responsável por: src/audio/**, public/audio/**, 
 - Altere SOMENTE os arquivos listados como seus. UI e áudio apenas escutam eventos; nenhuma regra de jogo neles.
 - Pronto = código tipado, testes/scripts passando e orçamento de performance respeitado (seção 2 da spec).
 - Ao terminar, reporte ao orquestrador: o que foi feito, arquivos tocados, comandos para verificar e pendências.
+
+## v2 (docs/SPEC-v2.md seção 5)
+Roteiro 1–90, novas falas, bordões, som do globo, jingles por prêmio, correções M4/M12, `npm run audio:preview` (WAV). NÃO gerar voz com API paga sem autorização do orquestrador/usuário.

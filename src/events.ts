@@ -3,11 +3,17 @@ import type { PatternId, RoundSummary } from './types';
 /** Mapa de eventos do jogo. UI e áudio apenas escutam. */
 export interface GameEvents {
   roundStart: { bet: number; totalBet: number };
-  ballDrawn: { ball: number; index: number; extra: boolean; fast: boolean };
+  /** `index` 0-based; `total` = 30 (principais) ou 9 (extras). */
+  ballDrawn: { ball: number; index: number; total: number; extra: boolean; fast: boolean };
   /** Cartela a 1 número de um padrão >= linha dupla (primeira vez na rodada). */
   almost: { cardIndex: number; pattern: PatternId; forBingo: boolean };
   patternWon: { cardIndex: number; pattern: PatternId; prize: number; ball: number };
-  extraOffer: { cost: number; remaining: number };
+  extraOffer: { cost: number; free: boolean; remaining: number; improves: { cardIndex: number; pattern: PatternId; gain: number }[] };
+  /** A próxima bola extra é grátis (destaque dourado, "Bola extra grátis!"). */
+  freeExtra: undefined;
+  /** Chegou/foi aberta uma carta do correio da sorte. */
+  mailbox: { kind: 'daily' | 'bonus'; amount: number; state: 'arrived' | 'opened' | 'claimed' };
+  turboChanged: { on: boolean };
   extraBought: { cost: number; number: number };
   roundEnd: { summary: RoundSummary; won: boolean };
   bingo: { cardIndex: number; viaExtra: boolean };

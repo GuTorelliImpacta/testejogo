@@ -30,13 +30,17 @@ export interface Card {
 
 export const CARD_COUNT = 4;
 export const BALLS_MAIN = 30;
-export const BALLS_EXTRA_MAX = 10;
-export const MAX_NUMBER = 60;
+export const BALLS_EXTRA_MAX = 9;
+export const MAX_NUMBER = 90;
+/** Largura da faixa de cada coluna da cartela: coluna c usa 18c+1..18c+18. */
+export const COL_SPAN = 18;
 
 /** Sequência completa pré-gerada para uma rodada. */
 export interface DrawPlan {
-  main: number[]; // 30 bolas
-  extras: number[]; // até 10 bolas extras
+  main: number[]; // 30 bolas (1..90)
+  extras: number[]; // até 9 bolas extras
+  /** free[i] = a i-ésima oferta de bola extra é GRÁTIS. Opcional (ausente = nenhuma). */
+  free?: boolean[];
 }
 
 export interface CardResult {
@@ -54,6 +58,7 @@ export interface RoundSummary {
   jackpot: number; // valor de acumulado pago (0 se nenhum)
   extrasUsed: number;
   extraCost: number;
+  freeExtras: number; // quantas extras foram grátis
   best: PatternId | null;
 }
 
@@ -69,12 +74,15 @@ export type GamePhase =
 
 export interface Settings {
   speed: 'lenta' | 'normal' | 'rapida';
+  turbo: boolean; // 30 bolas rápidas, voz só nos prêmios
+  bordoes: boolean; // bordões tradicionais de bingo na voz
   volMusic: number; // 0..1
   volVoice: number;
   volSfx: number;
   muted: boolean;
   captions: boolean;
   light: boolean; // modo leve
+  lightManual: boolean; // true = a pessoa escolheu; o automático não sobrescreve
   textSize: 'normal' | 'grande' | 'muito';
 }
 
@@ -97,8 +105,17 @@ export interface Stats {
   porPadrao: Partial<Record<PatternId, number>>;
 }
 
+/** Correio da sorte. */
+export interface MailState {
+  day: string; // dia ao qual `bonusToday`/`playMs` se referem
+  bonusToday: number; // correios ocasionais já entregues hoje
+  playMs: number; // tempo de jogo acumulado hoje
+  pending: { kind: 'daily' | 'bonus'; amount: number } | null; // carta esperando ser aberta
+}
+
 /** Rodada em andamento (para retomar ao reabrir). */
 export interface SavedRound {
+  extraSpent: number;
   bet: number;
   jackpot: number; // valor do acumulado em jogo
   plan: DrawPlan;
@@ -109,7 +126,7 @@ export interface SavedRound {
 }
 
 export interface SaveData {
-  version: 1;
+  version: 2;
   credits: number;
   bet: number;
   cards: Card[];
@@ -118,6 +135,8 @@ export interface SaveData {
   settings: Settings;
   director: DirectorState;
   stats: Stats;
-  lastDailyBonus: string; // "2026-10-20"
+  lastDailyBonus: string; // "2026-10-20" (dia em que o correio diário foi pego)
+  mail: MailState;
+  turboRounds: number; // rodadas jogadas (para liberar o modo leve automático após 3)
   round?: SavedRound | null;
 }

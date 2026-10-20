@@ -10,3 +10,6 @@ Você é o designer de UX. Responsável por: src/ui/**, src/styles/**, index.htm
 - Altere SOMENTE os arquivos listados como seus. UI e áudio apenas escutam eventos; nenhuma regra de jogo neles.
 - Pronto = código tipado, testes/scripts passando e orçamento de performance respeitado (seção 2 da spec).
 - Ao terminar, reporte ao orquestrador: o que foi feito, arquivos tocados, comandos para verificar e pendências.
+
+## v2 (docs/SPEC-v2.md seção 3)
+Novo layout estilo vídeo bingo: trilho de 30 bolas + 9 casas de extra, contador, tabela de prêmios fixa, painel de bola extra no lugar da bola (não modal), correio da sorte, selos de prêmio nas cartelas, controles Aposta/Cartelas/Números/Turbo, correções M1/M2/M3/M9, tocar na cartela não faz nada.

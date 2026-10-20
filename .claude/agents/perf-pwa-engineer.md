@@ -10,3 +10,6 @@ Você é o engenheiro de performance/PWA. Responsável por: src/main.ts, storage
 - Altere SOMENTE os arquivos listados como seus. UI e áudio apenas escutam eventos; nenhuma regra de jogo neles.
 - Pronto = código tipado, testes/scripts passando e orçamento de performance respeitado (seção 2 da spec).
 - Ao terminar, reporte ao orquestrador: o que foi feito, arquivos tocados, comandos para verificar e pendências.
+
+## v2 (docs/SPEC-v2.md seção 6)
+Lighthouse medido, M7/M8/M10, SW v2 com cache de voz, migração, deploy Vercel.
