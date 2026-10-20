@@ -4,6 +4,7 @@
 import { Bus } from '../../src/events';
 import { createAudio } from '../../src/audio';
 import { AudioEngine } from '../../src/audio/engine';
+import { Music } from '../../src/audio/music';
 import type { SpeechHandle } from '../../src/audio/engine';
 import { LINE_BY_ID } from '../../src/audio/script';
 import { estimateMs } from '../../src/audio/narrator';
@@ -54,7 +55,6 @@ const macrotask = () =>
     ch.port1.onmessage = () => r();
     ch.port2.postMessage(0);
   });
-void realSetTimeout;
 
 // ----- engine com "beep falado" no lugar dos clipes -----
 class BeepEngine extends AudioEngine {
@@ -145,10 +145,13 @@ export async function render(): Promise<PreviewResult> {
   const bus = new Bus();
   const timeline: Array<{ t: number; what: string }> = [];
   let forceBordao = false;
-  const audio = createAudio(bus, { engine, rnd: () => (forceBordao ? 0 : 0.99) });
+  // música pré-renderizada: o trabalho ocioso usa o relógio REAL (o setTimeout da página é virtual aqui)
+  const music = new Music(engine, { defer: (fn, ms) => realSetTimeout(fn, ms) });
+  const audio = createAudio(bus, { engine, music, rnd: () => (forceBordao ? 0 : 0.99) });
   audio.onCaption((c) => c && timeline.push({ t: +ctx.currentTime.toFixed(2), what: `legenda: ${c}` }));
   audio.setBordoes(true);
   await audio.unlock();
+  await music.whenReady(true); // todos os loops e stingers prontos antes de começar a prévia
 
   const mark = (what: string) => timeline.push({ t: +ctx.currentTime.toFixed(2), what });
   const emit = bus.emit.bind(bus) as (ev: string, p?: unknown) => void;

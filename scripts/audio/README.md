@@ -159,3 +159,9 @@ Se o app é offline (PWA), o service worker deve incluir `/audio/voice/` e `/aud
 | `jackpot_2` | ACUMULADO! Parabéns, Dona Altina! |
 
 Os textos entre aspas vêm de `src/audio/script.ts` (fonte única); rode `--list` para ver a versão atual.
+
+## Medir o custo da música
+
+`npx tsx scripts/audio/perf-music.ts <pasta-src> <segundos> [eco|none]` (Chromium real via Playwright/CDP): nós criados por segundo,
+callbacks de `setTimeout`, CPU da thread principal e de todos os processos. Para o "antes", extraia o commit anterior
+(`git archive <commit> src/audio | tar -x -C /tmp/old`) e passe `/tmp/old/src`. `THROTTLE=6` liga a limitação de CPU.

@@ -252,3 +252,32 @@ for (const SET of ['classico', 'variado'] as PatternSetName[]) {
 
   });
 }
+
+// v3: alvos amostrados com cada combinação de presets continuam sendo teto (nunca excedidos)
+import { sampleTarget, resolveTuning } from '../src/director';
+import { DEFAULT_TUNING } from '../src/config';
+
+for (const SET of ['classico', 'variado'] as PatternSetName[]) {
+  describe(`alvos dos presets (${SET})`, () => {
+    beforeAll(() => setPatternSet(SET));
+    afterAll(() => setPatternSet('classico'));
+
+    for (const nivel of ['menos', 'normal', 'mais'] as const) {
+      it(`premiosDoDia/ofertaExtra=${nivel}: o resultado nunca excede o teto`, () => {
+        const T = resolveTuning({ ...DEFAULT_TUNING, premiosDoDia: nivel, ofertaExtra: nivel });
+        const rng = seededRng(4242);
+        for (let i = 0; i < 120; i++) {
+          const cards = generateCards(rng);
+          const target = sampleTarget(ALL4, i % 9 === 0, rng, T);
+          const r = buildPlanDetailed(cards, ALL4, target, rng);
+          const sum = playRound(cards, ALL4, 5, 5000, r.plan, true).summary;
+          r.target.maxPattern.forEach((cap, k) => {
+            if (r.target.bingo && k === r.target.focus) return;
+            if (r.target.almost && k === r.target.focus) return;
+            expect(levelOf(sum.results[k].pattern)).toBeLessThanOrEqual(levelOf(cap));
+          });
+        }
+      });
+    }
+  });
+}

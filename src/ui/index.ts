@@ -23,8 +23,26 @@ export interface UIHandle {
   destroy(): void;
 }
 
+/** Chrome/WebView antigo (< 84) ignora `gap` em flex: o CSS usa margens quando a raiz tem `.nogap`. */
+function flexGapSupported(): boolean {
+  try {
+    const f = document.createElement('div');
+    f.style.cssText = 'display:flex;flex-direction:column;row-gap:1px;position:absolute;visibility:hidden';
+    const a = document.createElement('div');
+    a.style.height = '1px';
+    f.append(a, a.cloneNode());
+    document.body.appendChild(f);
+    const ok = f.scrollHeight === 3;
+    f.remove();
+    return ok;
+  } catch {
+    return true;
+  }
+}
+
 export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
   root.classList.add('altina');
+  if (!flexGapSupported()) root.classList.add('nogap');
   root.textContent = '';
   const unsubs: (() => void)[] = [];
 
@@ -249,7 +267,7 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
       modals.destroy();
       phoneMq.removeEventListener?.('change', placeCaption);
       root.textContent = '';
-      root.classList.remove('altina', 'light', 'x-on', 'has-mail', 'ts-normal', 'ts-grande', 'ts-muito');
+      root.classList.remove('altina', 'nogap', 'light', 'x-on', 'has-mail', 'ts-normal', 'ts-grande', 'ts-muito');
     },
   };
 }

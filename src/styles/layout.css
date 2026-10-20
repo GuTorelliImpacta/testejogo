@@ -1,13 +1,18 @@
-/* Altina da Sorte - layout responsivo v2 (grid). Tres modos:
-   paisagem (tablet principal), retrato (tablet) e celular (retrato estreito). */
+/* Altina da Sorte - layout responsivo v3 (grid).
+   Quatro modos, todos escolhidos so por CSS (orientacao/tamanho), nunca por JS:
+   paisagem (tablet principal), retrato (tablet), celular em pe e celular deitado (altura <= 500px).
+   Compatibilidade (Chrome/WebView ~60): clamp()/min()/max()/aspect-ratio/inset/gap em flex tem
+   valor-reserva simples primeiro; a versao moderna vem em blocos @supports no fim deste arquivo.
+   Espacos entre itens de flex usam margem (nao `gap`). */
 .altina, .altina * { box-sizing: border-box; }
 .altina {
   position: fixed;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   display: grid;
+  grid-gap: var(--gap);
   gap: var(--gap);
   padding: var(--pad);
   font-family: var(--font);
@@ -20,8 +25,8 @@
   background-color: var(--g900);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  user-select: none;
   -webkit-user-select: none;
+  user-select: none;
 }
 .altina .top     { grid-area: top; }
 .altina .ballsec { grid-area: ball; }
@@ -35,9 +40,9 @@
 
 /* ---------- paisagem (tablet principal) ---------- */
 .altina {
-  --panelw: clamp(330px, 38vw, 470px);
-  --ball: clamp(96px, 17vh, 150px);
-  --cellfs: max(20px, min(2.7vw, 5.4vh));
+  --panelw: 38vw;
+  --ball: 17vh;
+  --cellfs: 2.7vw;
   grid-template-columns: minmax(0, 1fr) var(--panelw);
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   grid-template-areas:
@@ -47,30 +52,33 @@
     "cards prize"
     "bar   bar";
 }
+@media (max-width: 868px) { .altina { --panelw: 330px; } }
+@media (min-width: 1238px) { .altina { --panelw: 470px; } }
+@media (max-height: 565px) { .altina { --ball: 96px; } }
+@media (min-height: 883px) { .altina { --ball: 150px; } }
+@media (max-width: 740px) { .altina { --cellfs: 20px; } }
+
 .altina .top {
-  display: flex; align-items: center; gap: var(--gap); min-height: 72px; min-width: 0;
+  display: flex; align-items: center; min-height: 72px; min-width: 0;
 }
+.altina .top > * + * { margin-left: var(--gap); }
 .altina .cards {
   display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-  gap: var(--gap); min-height: 0; min-width: 0;
+  grid-gap: var(--gap); gap: var(--gap); min-height: 0; min-width: 0;
 }
-.altina .bar {
-  display: grid; gap: var(--gap); align-items: stretch;
-  grid-template-columns: auto auto auto auto minmax(150px, 1fr);
-  grid-template-areas: "bet cg nums turbo play";
-}
-.altina .bar .rowa, .altina .bar .rowb { display: contents; }
-.altina .bar .g-bet   { grid-area: bet; }
-.altina .bar .g-cards { grid-area: cg; }
-.altina .bar .g-nums  { grid-area: nums; }
-.altina .bar .g-turbo { grid-area: turbo; }
-.altina .bar .g-play  { grid-area: play; }
+/* barra de baixo: [aposta][cartelas] | [Numeros][Turbo][JOGAR] (dois blocos flex, sem display:contents) */
+.altina .bar { display: flex; align-items: stretch; min-width: 0; }
+.altina .bar .rowa { display: flex; flex: none; align-items: stretch; }
+.altina .bar .rowb { display: flex; flex: 1 1 0; min-width: 0; align-items: stretch; margin-left: var(--gap); }
+.altina .bar .rowa > * + *, .altina .bar .rowb > * + * { margin-left: var(--gap); }
+.altina .bar .g-play { flex: 1 1 0; min-width: 150px; }
+.altina .bar .g-nums, .altina .bar .g-turbo { flex: none; }
 
 /* ---------- retrato (tablet) ---------- */
 @media (orientation: portrait) {
   .altina {
-    --ball: clamp(100px, 11vh, 140px);
-    --cellfs: max(20px, min(3.8vw, 3.2vh));
+    --ball: 11vh;
+    --cellfs: 3.4vw;
     --tcs: 36px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
@@ -82,23 +90,25 @@
       "cards"
       "bar";
   }
-  .altina .bar {
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-areas:
-      "bet bet bet bet bet bet cg cg cg cg cg cg"
-      "nums nums nums turbo turbo turbo play play play play play play";
-  }
+  .altina .bar { display: block; }
+  .altina .bar .rowa, .altina .bar .rowb { display: flex; margin-left: 0; }
+  .altina .bar .rowa > .grp { flex: 1 1 0; min-width: 0; }
+  .altina .bar .rowb { margin-top: var(--gap); }
+  .altina .bar .rowb .g-nums, .altina .bar .rowb .g-turbo { flex: 3 1 0; min-width: 0; }
+  .altina .bar .rowb .g-play { flex: 6 1 0; min-width: 0; }
 }
+@media (orientation: portrait) and (max-height: 909px) { .altina { --ball: 100px; } }
+@media (orientation: portrait) and (min-height: 1273px) { .altina { --ball: 140px; } }
 
-/* ---------- celular (retrato estreito) ---------- */
+/* ---------- celular em pe (retrato estreito) ---------- */
 @media (orientation: portrait) and (max-width: 599px) {
   .altina {
     --gap: 8px; --pad: 8px;
     --cellfs: 20px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: 64px minmax(0, 1fr) 64px 64px;
     grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "cred cred jack jack"
+      "logo cred jack jack"
       "cap  cap  snd  gear"
       "ball ball ball ball"
       "prize prize prize prize"
@@ -106,7 +116,8 @@
       "bar bar bar bar";
   }
   .altina .top { display: contents; }
-  .altina .top .logo, .altina .top .sp { display: none; }
+  .altina .top .sp { display: none; }
+  .altina .top .logo { grid-area: logo; }
   .altina .top .cred { grid-area: cred; }
   .altina .top .jack { grid-area: jack; }
   .altina .top .snd  { grid-area: snd; justify-self: center; }
@@ -115,15 +126,65 @@
   .altina .capslot { display: flex; grid-area: cap; align-items: center; min-width: 0; min-height: 64px; }
   .altina.has-mail .capslot { display: none; }
   .altina .xpanel { grid-row: ball-start / prize-end; grid-column: 1 / -1; }
-  .altina .bar { display: flex; flex-direction: column; gap: var(--gap); }
-  .altina .bar .rowa, .altina .bar .rowb { display: flex; gap: var(--gap); align-items: stretch; min-width: 0; }
-  .altina .bar .rowa .grp { flex: 1 1 0; min-width: 0; }
+  .altina .bar { display: flex; flex-direction: column; }
+  .altina .bar .rowa, .altina .bar .rowb { display: flex; align-items: stretch; min-width: 0; margin-left: 0; }
+  .altina .bar .rowb { margin-top: 12px; }
+  .altina .bar .rowa > * + *, .altina .bar .rowb > * + * { margin-left: 12px; }
+  .altina .bar .rowa > .grp { flex: 1 1 0; min-width: 0; }
   .altina .bar .rowb .g-nums, .altina .bar .rowb .g-turbo { flex: 0 0 100px; padding: 4px 2px; }
   .altina .bar .rowb .g-play { flex: 1 1 0; min-width: 0; }
 }
 
-/* paisagem baixa (celular deitado): sem trilho extra, bola menor */
-@media (orientation: landscape) and (max-height: 520px) {
-  .altina { --gap: 6px; --pad: 6px; --ball: 72px; --cellfs: max(20px, min(2.4vw, 6.5vh)); --panelw: clamp(260px, 36vw, 360px); }
+/* ---------- celular deitado (paisagem com altura <= 500px) ----------
+   Colunas: cartelas (esquerda) | direita em 2 meias-colunas.
+   Linhas: topo | faixa | tabela | Numeros+Turbo | [Aposta/Cartelas ... | JOGAR].
+   .bar e .rowb viram display:contents so aqui (celulares modernos) para os botoes irem direto para a grade. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .altina {
+    --gap: 6px; --pad: 4px; --vg: 12px;
+    --rw: 18vw;
+    --ball: 72px;
+    --cellfs: 20px;
+    --ts: 1; --tsb: 1;
+    grid-template-columns: minmax(0, 1fr) var(--rw) var(--rw);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "top   top   top"
+      "cards strip strip"
+      "cards prize prize"
+      "cards nums  turbo"
+      "steps steps play";
+    grid-row-gap: 4px; row-gap: 4px;
+  }
+  .altina.ts-grande, .altina.ts-muito { --ts: 1; --tsb: 1; }
   .altina .top { min-height: 64px; }
+  .altina .strip { display: grid; grid-area: strip; }
+  .altina .ptab { margin-bottom: 9px; } /* + 4 da grade = 13 ate Numeros/Turbo */
+  .altina .xpanel { grid-area: 2 / 2 / 4 / 4; margin-bottom: 9px; }
+  .altina.x-on .strip, .altina.x-on .ptab { display: none; }
+  .altina .cards { grid-area: 2 / 1 / 5 / 2; }
+  .altina .bar, .altina .bar .rowb { display: contents; }
+  .altina .bar .rowa { grid-area: steps; display: flex; align-items: stretch; min-width: 0; margin: 9px 0 0; }
+  .altina .bar .rowa > .grp { flex: 1 1 0; min-width: 0; }
+  .altina .bar .rowa > * + * { margin-left: var(--vg); }
+  .altina .bar .g-nums  { grid-area: nums; min-width: 0; margin: 0; }
+  .altina .bar .g-turbo { grid-area: turbo; min-width: 0; margin: 0 0 0 6px; }
+  .altina .bar .g-play { grid-area: play; min-width: 0; margin: 9px 0 0 6px; }
+  .altina .capslot { display: none; }
+}
+
+/* ---------- ajuste fino do tablet deitado baixo: nada novo, so os valores-reserva ---------- */
+
+/* ---------- versao moderna (clamp/min/max): mesmos valores de antes, com limites ---------- */
+@supports (width: clamp(1px, 2vw, 3px)) {
+  .altina { --panelw: clamp(330px, 38vw, 470px); --ball: clamp(96px, 17vh, 150px); --cellfs: max(20px, min(2.7vw, 5.4vh)); }
+  @media (orientation: portrait) {
+    .altina { --ball: clamp(100px, 11vh, 140px); --cellfs: max(20px, min(3.8vw, 3.2vh)); }
+  }
+  @media (orientation: portrait) and (max-width: 599px) {
+    .altina { --cellfs: 20px; }
+  }
+  @media (orientation: landscape) and (max-height: 500px) {
+    .altina { --ball: 72px; --cellfs: 20px; --rw: clamp(104px, 18vw, 160px); }
+  }
 }

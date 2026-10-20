@@ -1,7 +1,7 @@
-// Auditoria da UI v2 com Playwright (Chromium local, sem `playwright install`).
-// Uso: npx tsx tests/e2e/ui-audit.ts [cenario,cenario...] [--no-shots] [--ts=grande]
-// Sobe o vite dev na porta 4190 (ou usa UI_BASE), abre /src/ui/dev.html?s=<cenario> em 5 viewports,
-// salva docs/qa/v2-<cenario>-<WxH>.png e audita: rolagem, alvos < 64 px, texto < 20 px, espaco < 12 px,
+// Auditoria da UI v3 com Playwright (Chromium local, sem `playwright install`).
+// Uso: npx tsx tests/e2e/ui-audit.ts [cenario,cenario...] [--shots] [--ts=grande|muito] [--vp=WxH,WxH]
+// Sobe o vite dev na porta 4190 (ou usa UI_BASE), abre /src/ui/dev.html?s=<cenario> em 25 viewports (docs/SPEC-v3 1.5),
+// (--shots salva docs/qa/v3-depois-<cenario>-<WxH>.png so de tablets deitados e 3 celulares) e audita: rolagem, alvos < 64 px, texto < 20 px, espaco < 12 px,
 // dialogos com rolagem, textos cortados e sobreposicao entre regioes.
 import { chromium, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -10,19 +10,26 @@ import { mkdirSync } from 'node:fs';
 const PORT = 4191;
 const BASE = process.env.UI_BASE ?? `http://127.0.0.1:${PORT}`;
 const EXE = '/opt/pw-browsers/chromium';
-const VIEWPORTS = [
-  { w: 1280, h: 800 },
-  { w: 800, h: 1280 },
-  { w: 1024, h: 768 },
-  { w: 768, h: 1024 },
-  { w: 360, h: 740 },
+const VIEWPORTS = (
+  '1280x800,800x1280,1024x768,768x1024,960x600,600x960,1024x600,600x1024,1280x720,1366x768,1180x820,820x1180,1366x1024,1920x1080,1920x1200,' +
+  '360x740,375x667,390x844,412x915,430x932,740x360,667x375,844x390,915x412,932x430'
+)
+  .split(',')
+  .map((s) => { const [w, h] = s.split('x').map(Number); return { w, h }; });
+const ALL = [
+  'idle', 'mail-arrived', 'mail-open', 'drawing', 'drawing-turbo', 'extra', 'extra-free', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'daily',
+  'prizes', 'prizes-variado', 'settings', 'settings-jogo', 'settings-tela', 'pin', 'admin', 'admin-jogo', 'admin-jogo-2', 'admin-jogo-3', 'admin-jogo-4', 'admin-jogo-5', 'admin-resumo-2', 'admin-resumo-3', 'admin-resumo-4',
+  'admin-pin', 'admin-pin-2', 'admin-pin-3', 'admin-aparelho', 'admin-aparelho-2', 'admin-aparelho-3', 'admin-aparelho-4', 'settings-admin', 'idle-variado', 'idle-big', 'extra-big', 'drawing-big',
 ];
-const ALL = ['idle', 'drawing', 'extra', 'extra-free', 'mail-arrived', 'mail-open', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'prizes', 'settings', 'settings-jogo', 'settings-tela', 'pin', 'admin'];
+/** screenshots "depois" (so com --shots): tablets deitados + 3 celulares, em 4 cenarios */
+const SHOT_VP = new Set(['960x600', '1024x600', '1280x720', '1280x800', '1366x768', '1920x1200', '844x390', '360x740', '375x667']);
+const SHOT_NAMES = new Set(['idle', 'drawing', 'extra', 'admin']);
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith('--'));
 const names = args.filter((a) => !a.startsWith('--'))[0]?.split(',') ?? ALL;
-const shots = !flags.includes('--no-shots');
+const shots = flags.includes('--shots');
+const only = flags.find((f) => f.startsWith('--vp='))?.slice(5).split(',');
 const extraQuery = flags.filter((f) => f.startsWith('--q=')).map((f) => '&' + f.slice(4)).join('');
 
 async function startServer(): Promise<ChildProcess | null> {
@@ -112,6 +119,19 @@ async function audit(page: Page, label: string): Promise<string[]> {
     let minCell = 999;
     document.querySelectorAll<HTMLElement>('.card:not(.off) .cell').forEach((c) => { if (vis(c)) minCell = Math.min(minCell, c.getBoundingClientRect().height); });
     if (minCell < 19.5) out.push(`CELULA baixa ${Math.round(minCell)}px (min)`);
+    // v3: tudo visivel e tocavel sem rolar (so quando nao ha dialogo aberto)
+    if (!document.querySelector('.layer:not(.hide)') && !document.querySelector('.splash:not(.hide)')) {
+      const need = ['.logo', '.cred', '.jack', '.snd', '.gear', '.g-bet', '.g-cards', '.g-nums', '.g-turbo', '.g-play'];
+      const xOn = document.querySelector('.altina.x-on');
+      if (xOn) need.push('.xpanel', '.xbuy', '.xend'); else need.push('.counter', '.ptab');
+      if (!xOn) need.push('.strip, .trail');
+      for (const sel of need) {
+        const list = [...document.querySelectorAll(sel)].filter(vis);
+        if (!list.length) out.push(`AUSENTE ${sel}`);
+        else for (const e of list) { const r = e.getBoundingClientRect(); if (r.right > vw + 1 || r.bottom > vh + 1 || r.left < -1 || r.top < -1) out.push(`FORA DA TELA ${sel}`); }
+      }
+      if (document.querySelectorAll('.card')?.length !== 4 || [...document.querySelectorAll('.card')].some((c) => !vis(c))) out.push('AUSENTE 4 cartelas');
+    }
     // regioes principais nao podem se sobrepor
     const regs = ['.top', '.ballsec', '.xpanel', '.strip', '.trail', '.ptab', '.cards', '.bar', '.capslot'].map((s) => [s, document.querySelector(s)] as const)
       .filter(([, e]) => e && vis(e)).map(([s, e]) => [s, e!.getBoundingClientRect()] as const);
@@ -132,17 +152,20 @@ async function main(): Promise<void> {
   let problems = 0;
   try {
     for (const v of VIEWPORTS) {
+      if (only && !only.includes(`${v.w}x${v.h}`)) continue;
       const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();
       await page.addInitScript('window.__name = (f) => f;');
       page.on('pageerror', (e) => { problems++; console.log(`PAGEERROR ${e.message}`); });
       for (const name of names) {
         const tsq = flags.find((f) => f.startsWith('--ts='))?.slice(5);
-        await page.goto(`${BASE}/src/ui/dev.html?s=${name}${tsq ? `&ts=${tsq}` : ''}${extraQuery}`, { waitUntil: 'load' });
+        const base = name.replace(/-(big|variado)$/, '');
+        const mod = name.endsWith('-big') ? '&big=1' : name.endsWith('-variado') ? '&set=variado' : '';
+        await page.goto(`${BASE}/src/ui/dev.html?s=${base}${mod}${tsq ? `&ts=${tsq}` : ''}${extraQuery}`, { waitUntil: 'load' });
         await page.waitForTimeout(450);
         const label = `${name} ${v.w}x${v.h}`;
         const res = await audit(page, label);
-        if (shots) await page.screenshot({ path: `docs/qa/v2-${name}-${v.w}x${v.h}.png` });
+        if (shots && SHOT_NAMES.has(name) && SHOT_VP.has(`${v.w}x${v.h}`)) await page.screenshot({ path: `docs/qa/v3-depois-${name}-${v.w}x${v.h}.png` });
         problems += res.length;
         for (const r of res) console.log(r);
       }

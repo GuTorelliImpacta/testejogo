@@ -8,7 +8,7 @@ for (const vp of vps.split(',')) {
   for (const s of scs.split(',')) {
     await p.goto(`http://127.0.0.1:4191/src/ui/dev.html?s=${s}`);
     await p.waitForTimeout(500);
-    await p.screenshot({ path: `/home/user/testejogo/docs/qa/${prefix}-${s}-${vp}.png` });
+    await p.screenshot({ path: `${prefix.startsWith("/") ? prefix : "/home/user/testejogo/docs/qa/" + prefix}-${s}-${vp}.png` });
   }
   await c.close();
 }

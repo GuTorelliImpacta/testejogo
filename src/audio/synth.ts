@@ -3,12 +3,12 @@
 
 export const midiHz = (m: number): number => 440 * Math.pow(2, (m - 69) / 12);
 
-let noiseBuf: AudioBuffer | null = null;
-let noiseCtx: BaseAudioContext | null = null;
+const noiseCache = new WeakMap<BaseAudioContext, AudioBuffer>();
 
-/** 1 s de ruído branco reaproveitado por todas as percussões. */
+/** 1 s de ruído branco reaproveitado por todas as percussões (um por contexto, vivo ou offline). */
 export function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
-  if (noiseBuf && noiseCtx === ctx) return noiseBuf;
+  const hit = noiseCache.get(ctx);
+  if (hit) return hit;
   const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const d = b.getChannelData(0);
   let s = 12345;
@@ -16,18 +16,23 @@ export function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
     s = (s * 1664525 + 1013904223) >>> 0;
     d[i] = (s / 0x80000000 - 1) * 0.9;
   }
-  noiseBuf = b;
-  noiseCtx = ctx;
+  noiseCache.set(ctx, b);
   return b;
 }
 
 /** Registro de fontes ativas para poder calar tudo de uma vez. */
 export class Voices {
   private active = new Set<AudioScheduledSourceNode>();
-  constructor(readonly ctx: BaseAudioContext) {}
+  /** `offline`: contexto de pré-renderização; nada a rastrear nem desconectar (o grafo morre com a renderização). */
+  constructor(readonly ctx: BaseAudioContext, private offline = false) {}
 
   /** Agenda fonte [t, t+dur]; ao terminar desconecta `chain`. */
   run(src: AudioScheduledSourceNode, t: number, dur: number, chain: AudioNode[]): void {
+    if (this.offline) {
+      src.start(t);
+      src.stop(t + dur);
+      return;
+    }
     this.active.add(src);
     src.onended = () => {
       this.active.delete(src);

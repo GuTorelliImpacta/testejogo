@@ -6,38 +6,10 @@ import { MASKS } from '../patterns';
 import { T } from '../texts';
 import { btn, cloverSvg, fmt, h, setText, setCls } from './dom';
 import { U } from './uitext';
+import { focusDlg, focusFirst, layer } from './layer';
+import { createAdmin, makeDots, makeKeypad } from './admin';
 
 export type Local = 'prizes' | 'settings' | 'pin' | 'admin' | null;
-
-interface Layer {
-  layer: HTMLElement;
-  dlg: HTMLElement;
-  head: HTMLElement;
-  body: HTMLElement;
-  foot: HTMLElement;
-}
-
-/** Dialogo com cabecalho e rodape fixos; so o miolo (`body`) poderia rolar (nunca precisa). */
-function layer(cls = '', label = ''): Layer {
-  const l = h('div', 'layer hide ' + cls);
-  const d = h('div', 'dlg', undefined, { role: 'dialog', 'aria-modal': 'true' });
-  if (label) d.setAttribute('aria-label', label);
-  const head = h('div', 'dlg-head');
-  const body = h('div', 'dlg-body');
-  const foot = h('div', 'dlg-foot');
-  d.append(head, body, foot);
-  l.append(d);
-  return { layer: l, dlg: d, head, body, foot };
-}
-
-function focusFirst(root: HTMLElement): void {
-  const f = root.querySelector<HTMLElement>('button:not(:disabled)');
-  if (f) queueMicrotask(() => f.focus({ preventScroll: true }));
-}
-function focusDlg(root: HTMLElement): void {
-  root.setAttribute('tabindex', '-1');
-  queueMicrotask(() => root.focus({ preventScroll: true }));
-}
 
 export interface Modals {
   layers: HTMLElement[];
@@ -61,6 +33,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
 
   // ------------------------------------------------ premios (com desenhos)
   const P = layer('', T.prizes);
+  P.dlg.classList.add('hrow');
   P.head.append(h('h2', '', U.prizesTitle));
   const pSub = h('p');
   P.head.append(pSub);
@@ -95,6 +68,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
 
   // ------------------------------------------------ ajustes (3 abas, sem rolagem)
   const S = layer('', T.settings);
+  S.dlg.classList.add('hrow');
   S.head.append(h('h2', '', T.settings));
   const tabsEl = h('div', 'tabs', undefined, { role: 'tablist' });
   const panes: Record<string, HTMLElement> = { som: h('div', 'pane'), jogo: h('div', 'pane'), tela: h('div', 'pane') };
@@ -172,6 +146,10 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   mkSeg(panes.tela, U.textSize, 'textSize', [[U.sizeNormal, 'normal'], [U.sizeBig, 'grande'], [U.sizeHuge, 'muito']]);
   mkToggle(panes.tela, U.captions, (v) => v.settings.captions, (on) => api.updateSettings({ captions: on }), U.on, U.offs);
   mkToggle(panes.tela, U.light, (v) => v.settings.light, (on) => api.updateSettings({ light: on, lightManual: true }), U.lightOn, U.lightOff);
+  const admRow = h('div', 'trow arow');
+  const admBtn = btn('tg ghost', U.adminOpen, () => openLocal('pin'), 300);
+  admRow.append(admBtn);
+  panes.tela.append(admRow);
   S.foot.append(closeBtn());
   showTab('som');
 
@@ -254,108 +232,43 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
     focusFirst(C.dlg);
   }
 
-  // ------------------------------------------------ PIN e admin
+  // ------------------------------------------------ PIN e painel do neto
   const N = layer('', U.pinTitle);
+  N.dlg.classList.add('pindlg', 'hrow');
   let pin = '';
   N.head.append(h('h2', '', U.pinTitle));
-  const nDots = h('div', 'dots');
-  const dotEls = [0, 1, 2, 3].map(() => nDots.appendChild(h('i')));
+  const nDots = makeDots();
   const nMsg = h('p', 'pinmsg', '');
-  const keys = h('div', 'keys');
-  const refreshDots = () => dotEls.forEach((d, i) => setCls(d, 'on', i < pin.length));
-  const addKey = (k: string) => {
-    if (pin.length >= 4) return;
-    pin += k;
-    refreshDots();
-    if (pin.length === 4) {
-      const ok = api.admin.unlock(pin);
-      pin = '';
-      refreshDots();
-      if (ok) {
-        setText(nMsg, '');
-        refreshAdmin();
-        setLocal('admin');
-      } else setText(nMsg, U.pinWrong);
-    }
-  };
-  for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) keys.append(btn('', k, () => addKey(k), 80));
-  keys.append(
-    h('span'),
-    btn('', '0', () => addKey('0'), 80),
-    btn('', U.del, () => {
+  const keys = makeKeypad(
+    (k) => {
+      if (pin.length >= 4) return;
+      pin += k;
+      nDots.set(pin.length);
+      if (pin.length === 4) {
+        const ok = api.admin.unlock(pin);
+        pin = '';
+        nDots.set(0);
+        if (ok) {
+          setText(nMsg, '');
+          adm.open();
+          setLocal('admin');
+        } else setText(nMsg, U.pinWrong);
+      }
+    },
+    () => {
       pin = pin.slice(0, -1);
-      refreshDots();
-    }, 80),
+      nDots.set(pin.length);
+    },
   );
-  N.body.append(nDots, nMsg, keys);
-  N.foot.append(closeBtn(() => { pin = ''; refreshDots(); setLocal(null); }));
+  const nBox = h('div', 'pinbox');
+  const nLeft = h('div', 'pinl');
+  nLeft.append(nDots.el, nMsg);
+  nBox.append(nLeft, keys);
+  N.body.append(nBox);
+  N.foot.append(closeBtn(() => { pin = ''; nDots.set(0); setLocal(null); }));
 
-  const A = layer('', U.adminTitle);
-  A.dlg.classList.add('adm');
-  const aSnap = h('pre');
-  const aText = h('textarea', '', undefined, { rows: '3', 'aria-label': 'JSON', spellcheck: 'false', placeholder: 'JSON' });
-  const aMsg = h('div', 'msg');
-  let pend: string | null = null;
-  const refreshAdmin = () => {
-    try {
-      aSnap.textContent = JSON.stringify(api.admin.snapshot(), null, 1);
-      if (typeof bSet !== 'undefined') bSet.textContent = setLabel();
-    } catch {
-      aSnap.textContent = '-';
-    }
-  };
-  const sure = (key: string, fn: () => void, b: HTMLButtonElement, label: string) => {
-    if (pend === key) {
-      pend = null;
-      b.textContent = label;
-      fn();
-      refreshAdmin();
-    } else {
-      pend = key;
-      b.textContent = U.sure;
-    }
-  };
-  const bExp = btn('', U.export, () => {
-    const json = api.admin.exportJson();
-    aText.value = json;
-    try {
-      void navigator.clipboard?.writeText(json);
-    } catch {
-      /* ignora */
-    }
-    try {
-      const a = h('a', '', '', { href: URL.createObjectURL(new Blob([json], { type: 'application/json' })), download: 'altina-backup.json' });
-      a.click();
-    } catch {
-      /* ignora */
-    }
-    setText(aMsg, U.exported);
-  }, 300);
-  const bImp = btn('', U.import, () => {
-    setText(aMsg, api.admin.importJson(aText.value) ? U.importOk : U.importFail);
-    refreshAdmin();
-  }, 300);
-  const bJ: HTMLButtonElement = btn('', U.resetJackpot, () => sure('j', () => api.admin.resetJackpot(), bJ, U.resetJackpot), 300);
-  const bC: HTMLButtonElement = btn('', U.resetCredits, () => sure('c', () => api.admin.resetCredits(), bC, U.resetCredits), 300);
-  const setLabel = () => {
-    const cur = (api.admin.snapshot() as { conjuntoDePadroes?: string } | null)?.conjuntoDePadroes;
-    return cur === 'variado' ? U.patternSetVaried : U.patternSetClassic;
-  };
-  const bSet: HTMLButtonElement = btn('', setLabel(), () => {
-    const cur = (api.admin.snapshot() as { conjuntoDePadroes?: string } | null)?.conjuntoDePadroes;
-    api.admin.setPatternSet(cur === 'variado' ? 'classico' : 'variado');
-    bSet.textContent = setLabel();
-    refreshAdmin();
-  }, 300);
-  const aRow3 = h('div', 'row');
-  aRow3.append(bSet);
-  const aRow1 = h('div', 'row');
-  aRow1.append(bExp, bImp);
-  const aRow2 = h('div', 'row');
-  aRow2.append(bJ, bC);
-  A.head.append(h('h2', '', U.adminTitle));
-  A.body.append(aSnap, aText, aMsg, aRow1, aRow2, aRow3);
-  A.foot.append(closeBtn(() => { pend = null; setLocal(null); }));
+  const adm = createAdmin(api, () => setLocal(null));
+  const A = { layer: adm.layer, dlg: adm.dlg };
 
   const all = [P, S, G, M, C, N, A];
 
@@ -366,6 +279,16 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   document.addEventListener('keydown', onKey);
   cleanups.push(() => document.removeEventListener('keydown', onKey));
 
+  function openLocal(l: Local): void {
+    if (l === 'pin') {
+      pin = '';
+      nDots.set(0);
+      setText(nMsg, '');
+    }
+    if (l === 'settings') showTab(tab);
+    setLocal(l);
+  }
+
   let shownLocal: Local = null;
   let lastGiftKey = '';
   let lastMailKey = '';
@@ -373,15 +296,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   return {
     layers: all.map((x) => x.layer),
     local: () => local,
-    open(l) {
-      if (l === 'pin') {
-        pin = '';
-        refreshDots();
-        setText(nMsg, '');
-      }
-      if (l === 'settings') showTab(tab);
-      setLocal(l);
-    },
+    open: openLocal,
     sync(v, opts) {
       lastView = v;
       // ---- locais
@@ -469,6 +384,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
     destroy() {
       cancelAnimationFrame(rafId);
       cleanups.forEach((f) => f());
+      adm.destroy();
       void contBtn;
     },
   };

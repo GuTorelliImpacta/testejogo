@@ -131,21 +131,31 @@ export type PesosTeto = Partial<Record<PatternId | 'nada', number>>;
 /** Pesos do teto da rodada comum por nível de "Prêmios do dia a dia" e conjunto de padrões. `nada` = rodada sem prêmio. */
 export const PREMIOS_PRESETS: Record<Level3, Record<PatternSetName, PesosTeto>> = {
   menos: {
-    classico: { nada: 0.66, linha: 0.31, linhaDupla: 0.03 },
-    variado: { nada: 0.66, linha: 0.17, cantos: 0.09, piramide: 0.04, u: 0.02, linhaDupla: 0.01, moldura: 0.01 },
+    classico: { nada: 0.63, linha: 0.325, linhaDupla: 0.05 },
+    variado: { nada: 0.63, linha: 0.176, cantos: 0.092, piramide: 0.046, u: 0.028, linhaDupla: 0.014, moldura: 0.014 },
   },
   normal: {
     classico: { nada: 0.6, linha: 0.35, linhaDupla: 0.06 },
     variado: { nada: 0.6, linha: 0.19, cantos: 0.1, piramide: 0.05, u: 0.03, linhaDupla: 0.015, moldura: 0.015 },
   },
   mais: {
-    classico: { nada: 0.54, linha: 0.39, linhaDupla: 0.08 },
-    variado: { nada: 0.54, linha: 0.21, cantos: 0.11, piramide: 0.06, u: 0.035, linhaDupla: 0.02, moldura: 0.02 },
+    classico: { nada: 0.574, linha: 0.36, linhaDupla: 0.066 },
+    variado: { nada: 0.574, linha: 0.2025, cantos: 0.1065, piramide: 0.0533, u: 0.032, linhaDupla: 0.016, moldura: 0.016 },
   },
 };
 
+/**
+ * Compensação de RTP: as opções de bola extra mexem no denominador do RTP (apostas + extras pagas); estes fatores
+ * multiplicam os pesos de PRÊMIO (o que sobra vai para "sem prêmio") para o RTP comum seguir em ~0,88.
+ */
+export const RTP_COMP = {
+  ofertaExtra: { menos: 0.95, normal: 1, mais: 1.02 } as Record<Level3, number>,
+  chanceGratis: { menos: 1, normal: 1, mais: 0.98 } as Record<Level3, number>,
+  custoExtra: { barata: 0.94, normal: 1 } as Record<RuntimeTuning['custoExtra'], number>,
+};
+
 /** Frequência de oferta de bola extra: multiplica as chances base de oferta (hit/miss) da rodada comum. */
-export const EXTRA_PRESETS: Record<Level3, number> = { menos: 0.5, normal: 1, mais: 1.4 };
+export const EXTRA_PRESETS: Record<Level3, number> = { menos: 0.5, normal: 1, mais: 1.5 };
 
 /** Fração das ofertas de bola extra que são grátis. */
 export const GRATIS_PRESETS: Record<Level3, number> = { menos: 0.08, normal: 0.175, mais: 0.3 };

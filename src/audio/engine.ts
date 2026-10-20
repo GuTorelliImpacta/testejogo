@@ -1,5 +1,13 @@
 // Motor de áudio: um único AudioContext, grafo master → [music, voice, sfx],
 // volumes independentes, ducking, carregador de clipes em segundo plano.
+//
+// Memória (v3): os clipes baixados ficam COMPRIMIDOS (`raw`, ~7 KB cada); só são decodificados sob demanda
+// (`play`) ou por `warm()` (poucos ids). Os decodificados formam um LRU limitado por quantidade E por bytes
+// (o que estourar primeiro): 48 clipes / 24 MB no normal, 32 clipes / 12 MB no modo econômico. Ids "fixados"
+// (falas de prêmio/oferta) só saem se não houver mais nada a liberar. `preload()` nunca decodifica.
+// Ocioso: sem fala/efeito/música tocando por IDLE_SUSPEND_MS o AudioContext é suspenso (`ctx.suspend()`) e
+// volta em `wake()` (unlock, play, qualquer efeito ou evento do jogo).
+import { decodeCompat, getContextCtor } from './compat';
 
 export interface Volumes {
   music: number; // 0..1
@@ -29,13 +37,21 @@ export interface EngineOptions {
   baseUrl?: string;
   fetchFn?: typeof fetch;
   createContext?: () => AudioContext;
+  /** Tempo ocioso até suspender o contexto (padrão IDLE_SUSPEND_MS). */
+  idleMs?: number;
 }
 
 const DUCK_LEVEL = 0.3;
 const DUCK_DOWN_S = 0.18;
 const DUCK_UP_S = 0.25;
 const DUCK_RELEASE_DELAY_MS = 220;
-const MAX_DECODED = 48;
+/** Limites do cache de clipes decodificados (o menor que não causa 'stutter': ~48 números+prêmios recentes). */
+export const DECODED_LIMITS = {
+  normal: { clips: 48, bytes: 24 * 1024 * 1024 },
+  economy: { clips: 32, bytes: 12 * 1024 * 1024 },
+} as const;
+/** Sem atividade por este tempo (e sem música audível tocando) → AudioContext suspenso. */
+export const IDLE_SUSPEND_MS = 90_000;
 const FETCH_CONCURRENCY = 3;
 /** M12: folga sobre a duração do clipe, e limite para a decodificação. */
 const CLIP_SLACK_MS = 1500;
@@ -59,6 +75,9 @@ export class AudioEngine implements ClipPlayer {
   private raw = new Map<string, ArrayBuffer>();
   private missing = new Set<string>();
   private decoded = new Map<string, AudioBuffer>(); // ordem = LRU
+  private decodedBytes = 0;
+  private pinned = new Set<string>();
+  private limits: { clips: number; bytes: number } = DECODED_LIMITS.normal;
   private decoding = new Map<string, Promise<AudioBuffer | null>>();
   private queue: string[] = [];
   private queued = new Set<string>();
@@ -71,6 +90,12 @@ export class AudioEngine implements ClipPlayer {
   private visListeners = new Set<(hidden: boolean) => void>();
   private disposed = false;
   private silentDone = false;
+  private speaking = false;
+  private lastActive = Date.now();
+  private idleT: ReturnType<typeof setTimeout> | undefined;
+  private _idleSuspended = false;
+  /** O jogo informa se há música audível tocando (nesse caso nunca suspende por ociosidade). */
+  musicActive: () => boolean = () => false;
 
   constructor(private opts: EngineOptions = {}) {
     this.base = (opts.baseUrl ?? '/audio').replace(/\/$/, '');
@@ -78,7 +103,50 @@ export class AudioEngine implements ClipPlayer {
   }
 
   get unlocked(): boolean {
-    return !!this.ctx && this.ctx.state === 'running';
+    return !!this.ctx && (this.ctx.state === 'running' || this._idleSuspended);
+  }
+  /** true enquanto o contexto está suspenso por ociosidade (volta sozinho em wake()). */
+  get idleSuspended(): boolean {
+    return this._idleSuspended;
+  }
+
+  /** Modo econômico: cache de clipes decodificados menor. */
+  setEconomy(on: boolean): void {
+    this.limits = on ? DECODED_LIMITS.economy : DECODED_LIMITS.normal;
+    this.evict();
+  }
+
+  /** Atividade (fala, efeito, evento do jogo, toque): adia a suspensão e retoma o contexto se preciso. */
+  wake(): void {
+    if (this.disposed) return;
+    this.lastActive = Date.now();
+    if (this._idleSuspended && this.ctx) {
+      this._idleSuspended = false;
+      void this.ctx.resume().catch(() => {});
+    }
+    this.armIdle(this.opts.idleMs ?? IDLE_SUSPEND_MS);
+  }
+
+  private armIdle(ms: number): void {
+    if (this.idleT !== undefined || this.disposed || !this.ctx) return;
+    this.idleT = setTimeout(() => {
+      this.idleT = undefined;
+      this.checkIdle();
+    }, ms);
+  }
+
+  private checkIdle(): void {
+    const ctx = this.ctx;
+    if (!ctx || this.disposed) return;
+    const limit = this.opts.idleMs ?? IDLE_SUSPEND_MS;
+    const left = limit - (Date.now() - this.lastActive);
+    if (left > 0) return this.armIdle(left);
+    if (ctx.state === 'running' && !this._idleSuspended && !this.speaking && !this.musicActive()) {
+      this._idleSuspended = true; // antes do suspend: o handler de onstatechange não pode retomar
+      void ctx.suspend().catch(() => {});
+      return;
+    }
+    this.armIdle(limit); // música/fala em curso: confere de novo depois
   }
 
   /** Chamar no primeiro toque. Cria o contexto de forma síncrona (exigência dos navegadores). */
@@ -86,6 +154,8 @@ export class AudioEngine implements ClipPlayer {
     if (this.disposed) return;
     if (!this.ctx && !this.build()) return;
     const ctx = this.ctx!;
+    this._idleSuspended = false;
+    this.wake();
     try {
       if (ctx.state !== 'running') await ctx.resume();
     } catch {
@@ -107,8 +177,7 @@ export class AudioEngine implements ClipPlayer {
 
   private build(): boolean {
     try {
-      const Ctor: typeof AudioContext | undefined =
-        (globalThis as any).AudioContext ?? (globalThis as any).webkitAudioContext;
+      const Ctor: typeof AudioContext | undefined = getContextCtor();
       const ctx = this.opts.createContext ? this.opts.createContext() : Ctor ? new Ctor({ latencyHint: 'interactive' }) : null;
       if (!ctx) return false;
       this.ctx = ctx;
@@ -139,7 +208,9 @@ export class AudioEngine implements ClipPlayer {
     try {
       ctx.onstatechange = () => {
         const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
-        if (!this.disposed && this.ctx === ctx && ctx.state === 'suspended' && !hidden) void ctx.resume().catch(() => {});
+        if (!this.disposed && this.ctx === ctx && ctx.state === 'suspended' && !hidden && !this._idleSuspended) {
+          void ctx.resume().catch(() => {});
+        }
       };
     } catch {
       /* ignora */
@@ -151,7 +222,11 @@ export class AudioEngine implements ClipPlayer {
         const hidden = document.visibilityState === 'hidden';
         if (this.ctx && !this.disposed) {
           if (hidden) void this.ctx.suspend().catch(() => {});
-          else void this.ctx.resume().catch(() => {});
+          else {
+            this._idleSuspended = false;
+            this.lastActive = Date.now();
+            void this.ctx.resume().catch(() => {});
+          }
         }
         for (const l of this.visListeners) l(hidden);
       };
@@ -195,6 +270,8 @@ export class AudioEngine implements ClipPlayer {
   // ---------- ducking ----------
   /** Chamado pelo narrador quando começa/termina qualquer fala (clipe ou speechSynthesis). */
   setSpeaking(on: boolean): void {
+    this.speaking = on;
+    if (on) this.wake();
     if (!this.ctx) return;
     clearTimeout(this.releaseT);
     if (on) this.rampDuck(DUCK_LEVEL, DUCK_DOWN_S);
@@ -331,13 +408,13 @@ export class AudioEngine implements ClipPlayer {
     if (pending) return pending;
     const raw = this.raw.get(id);
     if (!raw || !this.ctx) return Promise.resolve(null);
-    const p = this.ctx
-      .decodeAudioData(raw.slice(0))
+    // callbacks + Promise (Chrome/WebView 60–72 e Safari antigo só têm a forma com callbacks)
+    const p = decodeCompat(this.ctx, raw.slice(0))
       .then((b) => {
+        if (this.disposed) return b;
         this.decoded.set(id, b);
-        while (this.decoded.size > MAX_DECODED) {
-          this.decoded.delete(this.decoded.keys().next().value as string); // libera o menos usado
-        }
+        this.decodedBytes += bufBytes(b);
+        this.evict(id);
         return b;
       })
       .catch(() => {
@@ -350,8 +427,34 @@ export class AudioEngine implements ClipPlayer {
     return p;
   }
 
+  /** Libera os menos usados (fora os fixados) até caber nos limites; `keep` nunca sai. */
+  private evict(keep?: string): void {
+    const over = () => this.decoded.size > this.limits.clips || this.decodedBytes > this.limits.bytes;
+    if (!over()) return;
+    for (const pass of [false, true]) {
+      for (const [k, b] of this.decoded) {
+        if (!over()) return;
+        if (k === keep || (!pass && this.pinned.has(k))) continue;
+        this.decoded.delete(k);
+        this.decodedBytes -= bufBytes(b);
+      }
+    }
+  }
+
+  /** Quantos buffers decodificados estão vivos agora (para testes de memória). */
+  get liveBuffers(): number {
+    return this.decoded.size;
+  }
+  get liveBufferBytes(): number {
+    return this.decodedBytes;
+  }
+
   /** Decodifica antecipadamente (ocioso) para eliminar latência nas falas principais. */
-  warm(ids: readonly string[]): void {
+  warm(ids: readonly string[], opts: { pin?: boolean } = {}): void {
+    if (opts.pin) {
+      for (const id of ids) this.pinned.add(id);
+      while (this.pinned.size > 24) this.pinned.delete(this.pinned.values().next().value as string);
+    }
     let i = 0;
     const step = () => {
       if (this.disposed || i >= ids.length) return;
@@ -366,6 +469,7 @@ export class AudioEngine implements ClipPlayer {
   play(id: string): SpeechHandle | null {
     const ctx = this.ctx;
     if (!ctx || !this.has(id)) return null;
+    this.wake();
     let stopped = false;
     let finished = false;
     let src: AudioBufferSourceNode | null = null;
@@ -414,6 +518,8 @@ export class AudioEngine implements ClipPlayer {
   dispose(): void {
     this.disposed = true;
     clearTimeout(this.releaseT);
+    clearTimeout(this.idleT);
+    this.idleT = undefined;
     if (this.visHandler && typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.visHandler);
     }
@@ -421,6 +527,8 @@ export class AudioEngine implements ClipPlayer {
     this.queue.length = 0;
     this.raw.clear();
     this.decoded.clear();
+    this.decodedBytes = 0;
+    this.pinned.clear();
     const c = this.ctx;
     this.ctx = null;
     if (c) void c.close().catch(() => {});
@@ -436,3 +544,5 @@ function canPlayWebmOpus(): boolean {
     return false;
   }
 }
+
+const bufBytes = (b: AudioBuffer): number => (b.length || Math.round(b.duration * b.sampleRate)) * (b.numberOfChannels || 1) * 4;

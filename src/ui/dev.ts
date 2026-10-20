@@ -1,18 +1,21 @@
 // Harness de desenvolvimento: monta a UI com um GameApi MOCK (nao usado em producao).
 // Abrir: /src/ui/dev.html?s=idle|drawing|extra|extra-free|mail-arrived|mail-open|bingo|bingo-cards|line|line-cards|gift|daily|prizes|settings|settings-jogo|settings-tela|pin|admin|splash
 //        &ts=grande&light=1&big=1 (7 digitos) &set=variado
+//        admin[-resumo|jogo|pin|aparelho][-pagina], settings-admin
 import { bus } from '../events';
-import { DEFAULT_SETTINGS, BET_OPTIONS, MULTIPLIER, PATTERN_SETS, jackpotShare } from '../config';
+import { DEFAULT_SETTINGS, DEFAULT_TUNING, BET_OPTIONS, MULTIPLIER, PATTERN_SETS, jackpotShare } from '../config';
 import { generateCards, markedMask } from '../cards';
 import { isComplete, levelOf, missing } from '../patterns';
 import { seededRng, shuffle } from '../rng';
 import type { GameApi, GameView } from '../gameApi';
-import type { Card, PatternId, RoundSummary } from '../types';
+import type { Card, PatternId, RoundSummary, RuntimeTuning } from '../types';
 import { mountUI, setSpokenCaption } from './index';
 
 const q = new URLSearchParams(location.search);
 const rng = seededRng(Number(q.get('seed') ?? 11));
 let setName: 'classico' | 'variado' = q.get('set') === 'variado' ? 'variado' : 'classico';
+let tuning: RuntimeTuning = { ...DEFAULT_TUNING, conjuntoPadroes: setName };
+let adminPin = '1958';
 
 const view: GameView = {
   phase: 'idle',
@@ -198,9 +201,54 @@ const api: GameApi = {
     emit();
   },
   admin: {
-    unlock: (pin) => pin === '1958',
-    snapshot: () => ({ credits: view.credits, jackpot: view.jackpot, rodadas: 12, bingos: ['2026-10-02', '2026-10-15'], rtp: 0.87 }),
-    exportJson: () => JSON.stringify({ version: 2, credits: view.credits }),
+    unlock: (pin) => pin === adminPin,
+    lock: () => {},
+    stats: () => ({
+      creditos: view.credits,
+      acumulado: view.jackpot,
+      bingosNoMes: 2,
+      ultimosBingos: ['15/10/2026', '02/10/2026', '19/09/2026', '04/09/2026', '21/08/2026', '08/08/2026', '25/07/2026', '12/07/2026'],
+      diasDesdeUltimoBingo: 5,
+      rodadas: q.get('big') ? 1234567 : 342,
+      rodadasPorDia: 14.3,
+      premiosPorTipo: { linha: 120, cantos: 31, piramide: 12, u: 9, linhaDupla: 41, moldura: 3, bingo: 8 },
+      rtpComum: 0.884,
+      rtpTotal: 0.931,
+      recargas: 3,
+      tuning: { ...tuning },
+    }),
+    device: () => ({
+      userAgent: q.get('ua') ?? 'Mozilla/5.0 (Linux; Android 6.0.1; SM-T285 Build/MMB29M; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/72.0.3626.121 Safari/537.36',
+      chromeVersion: '72.0.3626.121',
+      deviceMemory: 1,
+      cores: 4,
+      screen: `${screen.width}x${screen.height} @${devicePixelRatio}`,
+      viewport: `${innerWidth}x${innerHeight}`,
+      dpr: devicePixelRatio,
+      fpsMedio: 47.3,
+      piorQuadroMs: 83,
+      memoriaJsMB: 38,
+      modoEconomico: true,
+      sw: 'v3',
+    }),
+    getTuning: () => ({ ...tuning }),
+    setTuning: (p) => {
+      tuning = { ...tuning, ...p };
+      if (p.conjuntoPadroes) setName = p.conjuntoPadroes;
+      emit();
+    },
+    resetTuning: () => {
+      tuning = { ...DEFAULT_TUNING };
+      setName = tuning.conjuntoPadroes;
+      emit();
+    },
+    changePin: (o, n) => {
+      if (o !== adminPin || !/^\d{4}$/.test(n)) return false;
+      adminPin = n;
+      return true;
+    },
+    resetPin: (d) => d === '1958' && ((adminPin = '1958'), true),
+    exportJson: () => JSON.stringify({ version: 3, credits: view.credits, tuning, adminPin }),
     importJson: (s) => {
       try {
         JSON.parse(s);
@@ -314,11 +362,27 @@ function scenario(name: string): void {
     const tab = name.split('-')[1];
     if (tab) [...document.querySelectorAll<HTMLElement>('.tabs .tab')].find((b) => b.textContent!.toLowerCase() === tab)?.click();
   }
-  if (name === 'pin' || name === 'admin') {
+  if (name === 'pin' || name.startsWith('admin')) {
     for (let i = 0; i < 5; i++) document.querySelector<HTMLElement>('.top .logo')!.click();
-    if (name === 'admin') {
-      for (const k of '1958') [...document.querySelectorAll<HTMLElement>('.keys .btn')].find((b) => b.textContent === k)!.click();
+    const press = (root: string, keys: string) => {
+      for (const k of keys) [...document.querySelectorAll<HTMLElement>(`${root} .keys .btn`)].find((b) => b.textContent === k)!.click();
+    };
+    const m = /^admin(?:-(resumo|jogo|pin|aparelho))?(?:-(\d))?$/.exec(name);
+    if (m) {
+      press('.pindlg', '1958');
+      const tab = m[1] ?? 'resumo';
+      document.querySelector<HTMLElement>(`.adm .tab[data-tab="${tab}"]`)!.click();
+      const n = Number(m[2] ?? 1);
+      if (tab === 'pin') {
+        if (n >= 2) press('.adm', '1958');
+        if (n >= 3) press('.adm', '4321');
+      } else for (let i = 1; i < n; i++) document.querySelectorAll<HTMLElement>(`.adm .p-${tab} .pgb`)[1]?.click();
     }
+  }
+  if (name === 'settings-admin') {
+    document.querySelector<HTMLElement>('.top .gear')!.click();
+    [...document.querySelectorAll<HTMLElement>('.tabs .tab')].find((b) => b.textContent!.toLowerCase() === 'tela')?.click();
+    document.querySelector<HTMLElement>('.arow .btn')!.click();
   }
 }
 (window as unknown as { __dev: unknown }).__dev = { scenario, api, view, setSpokenCaption };

@@ -105,13 +105,13 @@ const PRESETS: Record<string, PresetDef> = {
   bingo1: { ...BASE, bingo: { lo: 1, hi: 1, share: 0.9, strict: false }, tuning: { ...T0, bingosPorMes: '1' }, descr: '1 bingo/mês em >= 90% dos meses completos' },
   bingo2: { ...BASE, bingo: { lo: 2, hi: 2, share: 0.9, strict: false }, tuning: { ...T0, bingosPorMes: '2' }, descr: '2 bingos/mês em >= 90% dos meses completos' },
   bingo34: { ...BASE, bingo: { lo: 3, hi: 4, share: 0.9, strict: false }, tuning: { ...T0, bingosPorMes: '3-4' }, descr: '3-4 bingos/mês em >= 90%, intervalo >= 5 dias' },
-  'premios-menos': { ...BASE, noPrize: [0.62, 0.70], linha: [0.25, 0.32], dupla: [0.03, 0.05], rtp: [0.77, 0.83], tuning: { ...T0, premiosDoDia: 'menos' }, descr: 'prêmios do dia a dia: menos (RTP comum ~0,80)' },
-  'premios-mais': { ...BASE, noPrize: [0.48, 0.56], linha: [0.36, 0.44], dupla: [0.07, 0.10], rtp: [0.92, 0.98], tuning: { ...T0, premiosDoDia: 'mais' }, descr: 'prêmios do dia a dia: mais (RTP comum ~0,95)' },
-  'extra-menos': { ...BASE, ofertas: [0.12, 0.18], tuning: { ...T0, ofertaExtra: 'menos' }, descr: 'oferta de bola extra: menos (~15%)' },
-  'extra-mais': { ...BASE, ofertas: [0.36, 0.44], tuning: { ...T0, ofertaExtra: 'mais' }, descr: 'oferta de bola extra: mais (~40%)' },
+  'premios-menos': { ...BASE, noPrize: [0.60, 0.66], linha: [0.30, 0.37], dupla: [0.04, 0.065], rtp: [0.77, 0.83], tuning: { ...T0, premiosDoDia: 'menos' }, descr: 'prêmios do dia a dia: menos (RTP comum ~0,80)' },
+  'premios-mais': { ...BASE, noPrize: [0.52, 0.58], linha: [0.36, 0.42], dupla: [0.06, 0.09], rtp: [0.92, 0.98], tuning: { ...T0, premiosDoDia: 'mais' }, descr: 'prêmios do dia a dia: mais (RTP comum ~0,95)' },
+  'extra-menos': { ...BASE, noPrize: [0.57, 0.64], ofertas: [0.12, 0.18], tuning: { ...T0, ofertaExtra: 'menos' }, descr: 'oferta de bola extra: menos (~15%)' },
+  'extra-mais': { ...BASE, noPrize: [0.55, 0.62], ofertas: [0.36, 0.44], tuning: { ...T0, ofertaExtra: 'mais' }, descr: 'oferta de bola extra: mais (~40%)' },
   'gratis-menos': { ...BASE, gratis: [0.06, 0.10], tuning: { ...T0, chanceGratis: 'menos' }, descr: 'bola grátis: menos (~8% das ofertas)' },
   'gratis-mais': { ...BASE, gratis: [0.26, 0.34], tuning: { ...T0, chanceGratis: 'mais' }, descr: 'bola grátis: mais (~30% das ofertas)' },
-  'extra-barata': { ...BASE, tuning: { ...T0, custoExtra: 'barata' }, descr: 'bola extra mais barata (custo 4%)' },
+  'extra-barata': { ...BASE, noPrize: [0.57, 0.65], tuning: { ...T0, custoExtra: 'barata' }, descr: 'bola extra mais barata (custo 4%)' },
 };
 let CFG: ResolvedTuning = resolveTuning(T0);
 let TUN: RuntimeTuning = T0;

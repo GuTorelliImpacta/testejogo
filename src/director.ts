@@ -1,6 +1,6 @@
 import type { Card, DirectorState, DrawPlan, PatternId, RuntimeTuning } from './types';
 import {
-  TUNING, BINGO_PRESETS, COST_FACTOR, DEFAULT_TUNING, EXTRA_PRESETS, GRATIS_PRESETS, PREMIOS_PRESETS, getPatternSet,
+  TUNING, BINGO_PRESETS, COST_FACTOR, DEFAULT_TUNING, EXTRA_PRESETS, GRATIS_PRESETS, PREMIOS_PRESETS, RTP_COMP, getPatternSet,
 } from './config';
 import type { PatternSetName, PesosTeto } from './config';
 import type { Rng } from './rng';
@@ -66,6 +66,23 @@ export interface ResolvedTuning {
   costFactor: number;
 }
 
+function compensar(p: Record<PatternSetName, PesosTeto>, f: number): Record<PatternSetName, PesosTeto> {
+  if (f === 1) return p;
+  const out = {} as Record<PatternSetName, PesosTeto>;
+  for (const k of Object.keys(p) as PatternSetName[]) {
+    const w: PesosTeto = {};
+    let premios = 0;
+    for (const [id, v] of Object.entries(p[k]) as [PatternId | 'nada', number][]) {
+      if (id === 'nada') continue;
+      w[id] = v * f;
+      premios += v;
+    }
+    w.nada = (p[k].nada ?? 0) + premios * (1 - f);
+    out[k] = w;
+  }
+  return out;
+}
+
 /** Traduz os presets do painel em números. Pura: o mesmo RuntimeTuning dá sempre o mesmo resultado. */
 export function resolveTuning(t: RuntimeTuning): ResolvedTuning {
   const P = DIRECTOR_PARAMS;
@@ -74,7 +91,7 @@ export function resolveTuning(t: RuntimeTuning): ResolvedTuning {
   return {
     ...b,
     chanceBingoNaExtra: TUNING.chanceBingoNaExtra,
-    pesos: PREMIOS_PRESETS[t.premiosDoDia] ?? PREMIOS_PRESETS.normal,
+    pesos: compensar(PREMIOS_PRESETS[t.premiosDoDia] ?? PREMIOS_PRESETS.normal, (RTP_COMP.ofertaExtra[t.ofertaExtra] ?? 1) * (RTP_COMP.chanceGratis[t.chanceGratis] ?? 1) * (RTP_COMP.custoExtra[t.custoExtra] ?? 1)),
     taxaQuaseBingo: P.taxaQuaseBingo,
     chanceGratis: GRATIS_PRESETS[t.chanceGratis] ?? P.chanceGratis,
     missSemPremio: Math.min(0.9, P.missSemPremio * k),

@@ -11,7 +11,10 @@ export class Sfx {
   /** Retorna [voices, destino, t0] ou null se o áudio ainda não foi liberado. */
   private env(): { v: Voices; d: AudioNode; t: number } | null {
     const ctx = this.engine.ctx;
-    if (!ctx || ctx.state !== 'running' || !this.engine.audible) return null;
+    if (!ctx || !this.engine.audible) return null;
+    const wasIdle = this.engine.idleSuspended;
+    this.engine.wake(); // retoma o contexto se estava suspenso por ociosidade (o efeito toca assim que voltar)
+    if (ctx.state !== 'running' && !wasIdle) return null;
     if (ctx !== this.lastCtx || !this.voices) {
       this.voices = new Voices(ctx);
       this.lastCtx = ctx;

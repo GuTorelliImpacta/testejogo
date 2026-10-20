@@ -263,3 +263,129 @@ for (const SET of ['classico', 'variado'] as PatternSetName[]) {
     }, 60_000);
   });
 }
+
+// ---------------------------------------------------------------------------
+// v3: configuração em tempo de execução
+// ---------------------------------------------------------------------------
+import { BINGO_PRESETS, COST_FACTOR, DEFAULT_TUNING } from '../src/config';
+import type { RuntimeTuning } from '../src/types';
+import { resolveTuning } from '../src/director';
+
+describe('resolveTuning', () => {
+  it('padrão = valores atuais', () => {
+    const r = resolveTuning(DEFAULT_TUNING);
+    expect(r.bingoPorMesAlvo).toBe(TUNING.bingoPorMesAlvo);
+    expect(r.bingoMaxPorMes).toBe(TUNING.bingoMaxPorMes);
+    expect(r.diasMinEntreBingos).toBe(TUNING.diasMinEntreBingos);
+    expect(r.diasForcarBingo).toBe(TUNING.diasForcarBingo);
+    expect(r.chanceGratis).toBe(DIRECTOR_PARAMS.chanceGratis);
+    expect(r.hitComPremio).toBe(DIRECTOR_PARAMS.hitComPremio);
+    expect(r.pesos.classico).toEqual(DIRECTOR_PARAMS.pesos.classico);
+    expect(r.costFactor).toBe(0.08);
+  });
+
+  it('cada opção do painel muda os números certos', () => {
+    for (const k of ['1', '2', '2-3', '3-4'] as const) {
+      const r = resolveTuning({ ...DEFAULT_TUNING, bingosPorMes: k });
+      expect(r).toMatchObject(BINGO_PRESETS[k]);
+    }
+    const menos = resolveTuning({ ...DEFAULT_TUNING, premiosDoDia: 'menos' });
+    const mais = resolveTuning({ ...DEFAULT_TUNING, premiosDoDia: 'mais' });
+    expect(menos.pesos.classico.nada!).toBeGreaterThan(mais.pesos.classico.nada!);
+    expect(menos.pesos.variado.nada!).toBeGreaterThan(mais.pesos.variado.nada!);
+    const eM = resolveTuning({ ...DEFAULT_TUNING, ofertaExtra: 'menos' });
+    const eP = resolveTuning({ ...DEFAULT_TUNING, ofertaExtra: 'mais' });
+    expect(eM.hitComPremio).toBeLessThan(eP.hitComPremio);
+    const g = (c: 'menos' | 'normal' | 'mais') => resolveTuning({ ...DEFAULT_TUNING, chanceGratis: c }).chanceGratis;
+    expect(g('menos')).toBeLessThan(g('normal'));
+    expect(g('normal')).toBeLessThan(g('mais'));
+    expect(resolveTuning({ ...DEFAULT_TUNING, custoExtra: 'barata' }).costFactor).toBe(COST_FACTOR.barata);
+  });
+
+  it('tudo é probabilidade válida e intervalos são coerentes', () => {
+    for (const b of ['1', '2', '2-3', '3-4'] as const)
+      for (const l of ['menos', 'normal', 'mais'] as const) {
+        const r = resolveTuning({ ...DEFAULT_TUNING, bingosPorMes: b, ofertaExtra: l, chanceGratis: l, premiosDoDia: l });
+        expect(r.diasMinEntreBingos).toBeLessThan(r.diasAlvoEntreBingos);
+        expect(r.diasAlvoEntreBingos).toBeLessThan(r.diasForcarBingo);
+        expect(r.hitComPremio + r.missComPremio).toBeLessThan(1);
+        expect(r.chanceGratis).toBeGreaterThan(0);
+        expect(r.chanceGratis).toBeLessThan(1);
+      }
+  });
+});
+
+describe('planRound com presets', () => {
+  const tunings: RuntimeTuning[] = (['1', '2', '2-3', '3-4'] as const).map((b) => ({ ...DEFAULT_TUNING, bingosPorMes: b }));
+
+  it('bingoChance respeita mínimo de dias e teto mensal de cada preset', () => {
+    for (const t of tunings) {
+      const r = resolveTuning(t);
+      const tm = TM;
+      const d = (dias: number, noMes = 0): DirectorState =>
+        state({ ultimoBingoEm: tm - dias * DAY_MS, rodadasDesdeUltimoBingo: 100, bingosPorMes: noMes ? { [monthKey(tm)]: noMes } : {} });
+      expect(bingoChance(d(r.diasMinEntreBingos - 0.01), tm, r)).toBe(0);
+      expect(bingoChance(d(r.diasMinEntreBingos + 0.5), tm, r)).toBeGreaterThan(0);
+      expect(bingoChance(d(r.diasForcarBingo + 3, r.bingoMaxPorMes), tm, r)).toBe(0);
+    }
+  });
+
+  for (const t of tunings) {
+    it(`simulação de 120 dias com bingosPorMes=${t.bingosPorMes}: intervalos e teto mensal`, () => {
+      const r = resolveTuning(t);
+      const rng = seededRng(77);
+      let d = initialDirector(T0);
+      const times: number[] = [];
+      const perMonth: Record<string, number> = {};
+      let cards = generateCards(rng);
+      for (let day = 0; day < 120; day++) {
+        for (let k = 0; k < 8; k++) {
+          const now = T0 + day * DAY_MS + (k * 12 * 3_600_000) / 8;
+          if ((day * 8 + k) % 6 === 0) cards = generateCards(rng);
+          const { plan, intendedBingo } = planRound({ cards, active: ACTIVE, bet: 5, now, director: d, rng, tuning: t });
+          const { summary } = playRound(cards, ACTIVE, 5, 5000, plan, true);
+          const had = summary.results.some((x) => x.pattern === 'bingo');
+          expect(had).toBe(intendedBingo);
+          if (had) {
+            times.push(now);
+            perMonth[monthKey(now)] = (perMonth[monthKey(now)] ?? 0) + 1;
+          }
+          d = afterRound(d, now, had);
+        }
+      }
+      expect(times.length).toBeGreaterThanOrEqual(2);
+      for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(r.diasMinEntreBingos * DAY_MS - 1);
+      for (const n of Object.values(perMonth)) expect(n).toBeLessThanOrEqual(r.bingoMaxPorMes);
+    }, 60_000);
+  }
+
+  it('trocar o preset no meio respeita o histórico do mês (teto já atingido)', () => {
+    const d = state({ ultimoBingoEm: TM - 30 * DAY_MS, rodadasDesdeUltimoBingo: 500, bingosPorMes: { [monthKey(TM)]: 1 } });
+    const rng = seededRng(5);
+    const cards = generateCards(rng);
+    const um = { ...DEFAULT_TUNING, bingosPorMes: '1' as const };
+    for (let i = 0; i < 20; i++) {
+      const { plan, intendedBingo } = planRound({ cards, active: ACTIVE, bet: 5, now: TM, director: d, rng, tuning: um });
+      expect(intendedBingo).toBe(false);
+      expect(playRound(cards, ACTIVE, 5, 5000, plan, true).summary.results.some((x) => x.pattern === 'bingo')).toBe(false);
+    }
+  });
+
+  it('plan.free usa a chance do preset', () => {
+    const cards = generateCards(seededRng(9));
+    let free = 0;
+    let tot = 0;
+    for (const c of ['menos', 'mais'] as const) {
+      free = 0; tot = 0;
+      const rng = seededRng(11);
+      for (let i = 0; i < 600; i++) {
+        const { plan } = planRound({ cards, active: ACTIVE, bet: 5, now: T0, director: state({ ultimoBingoEm: T0 - DAY_MS }), rng, tuning: { ...DEFAULT_TUNING, chanceGratis: c, ofertaExtra: 'mais' } });
+        free += plan.free!.filter(Boolean).length;
+        tot += plan.free!.length;
+      }
+      const fr = free / tot;
+      if (c === 'menos') expect(fr).toBeLessThan(0.14);
+      else expect(fr).toBeGreaterThan(0.2);
+    }
+  });
+});

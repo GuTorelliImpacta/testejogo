@@ -72,7 +72,7 @@
 @keyframes wobble { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
 
 /* ---------- bola grande + contador + legenda ---------- */
-.altina .ballsec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--gap); align-items: center; min-width: 0; min-height: 0; }
+.altina .ballsec { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-gap: var(--gap); gap: var(--gap); align-items: center; min-width: 0; min-height: 0; }
 .altina .ballbox { display: grid; place-items: center; }
 .altina .binfo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .altina .counter { font-size: calc(32px * var(--ts)); font-weight: 900; line-height: 1.05; color: var(--gold); text-shadow: 0 2px 0 #000b; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -95,7 +95,7 @@
   color: var(--ink); flex: none;
   box-shadow: 0 6px 14px #0008, inset 0 -6px 10px #0004;
 }
-.altina .ball::before { content: ""; position: absolute; inset: 17%; border-radius: 50%; background: #fffdf3; box-shadow: inset 0 2px 5px #0003; }
+.altina .ball::before { content: ""; position: absolute; top: 17%; right: 17%; bottom: 17%; left: 17%; border-radius: 50%; background: #fffdf3; box-shadow: inset 0 2px 5px #0003; }
 .altina .ball b { position: relative; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.03em; color: #111; }
 .altina .ball.empty { opacity: .35; }
 .altina .ball.r1 { --ba: var(--b1a); --bb: var(--b1b); }
@@ -108,13 +108,14 @@
   background: var(--gold); color: var(--ink); font-weight: 900; font-size: calc(var(--ball) * .22);
   display: grid; place-items: center; line-height: 1;
 }
-.altina .ballbox .ball.shine::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 28% 22%, #fff9 0, transparent 35%); }
+.altina .ballbox .ball.shine::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 50%; background: radial-gradient(circle at 28% 22%, #fff9 0, transparent 35%); }
 
 /* ---------- trilho: 30 casas (3x10) + 9 casas de extra ---------- */
-.altina .trail { display: grid; gap: 8px; padding: 6px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22; min-width: 0; align-content: start; }
-.altina .tr-main, .altina .tr-extra, .altina .srow { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.altina .trail { display: grid; grid-gap: 8px; gap: 8px; padding: 6px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22; min-width: 0; align-content: start; }
+.altina .tr-main, .altina .tr-extra, .altina .srow { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); grid-gap: 3px; gap: 3px; }
 .altina .tc {
-  display: grid; place-items: center; width: min(100%, var(--tcs, 100%)); aspect-ratio: 1; justify-self: center;
+  display: grid; place-items: center; width: 100%; max-width: var(--tcs, none); justify-self: center;
+  width: min(100%, var(--tcs, 100%)); aspect-ratio: 1;
   border-radius: 50%; font-style: normal; font-weight: 800; font-size: 20px; line-height: 1; letter-spacing: -.05em;
   font-variant-numeric: tabular-nums; color: #fff; background: #ffffff14; border: 2px solid transparent; overflow: hidden;
 }
@@ -136,8 +137,8 @@
   align-self: stretch;
 }
 .altina .ptab .ph { font-size: var(--fs); font-weight: 900; color: var(--gold-l); line-height: 1.1; padding: 0 6px; }
-.altina .prows { display: grid; gap: 3px; align-content: space-evenly; flex: 1; min-height: 0; }
-.altina .ptab.many .prows { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+.altina .prows { display: grid; grid-gap: 3px; gap: 3px; align-content: space-evenly; flex: 1; min-height: 0; }
+.altina .ptab.many .prows { grid-template-columns: 1fr 1fr; grid-column-gap: 8px; column-gap: 8px; }
 .altina .pr {
   position: relative; display: flex; justify-content: space-between; align-items: center; gap: 8px;
   padding: 3px 8px; border-radius: 8px; font-size: calc(24px * var(--ts)); font-weight: 800; line-height: 1.1; background: #ffffff0f;
@@ -147,7 +148,7 @@
 .altina .pr .pv { color: var(--gold); font-weight: 900; font-variant-numeric: tabular-nums; }
 .altina .pr .short { display: none; }
 .altina .pr.jk .nm { color: var(--gold-l); }
-.altina .pr.win::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: var(--gold); animation: winp .45s ease-in-out infinite alternate; z-index: 0; }
+.altina .pr.win::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; border-radius: 8px; background: var(--gold); animation: winp .45s ease-in-out infinite alternate; z-index: 0; }
 .altina .pr.win .nm, .altina .pr.win .pv { color: var(--ink); }
 @keyframes winp { from { opacity: .25; } to { opacity: 1; } }
 
@@ -185,12 +186,11 @@
 .altina .btn.g-play { flex-direction: column; gap: 2px; padding: 6px 10px; }
 .altina .g-play .ps { font-size: 20px; letter-spacing: 0; font-weight: 800; }
 @media (orientation: portrait) and (max-width: 599px) {
-  .altina .bar { gap: 12px; }
   .altina .bar .btn.sec { min-width: 0; letter-spacing: -.03em; }
   .altina .g-turbo .ti { display: none; }
   .altina .g-turbo .tt { align-items: center; }
   .altina .btn.g-play { min-height: 80px; font-size: calc(30px * var(--ts)); letter-spacing: .02em; }
-  .altina .grp { display: grid; grid-template-columns: 64px 64px; grid-template-areas: "box box" "mi pl"; justify-content: center; gap: 4px 12px; }
+  .altina .grp { display: grid; grid-template-columns: 64px 64px; grid-template-areas: "box box" "mi pl"; justify-content: center; grid-gap: 4px 12px; gap: 4px 12px; }
   .altina .grp > .sq:first-child { grid-area: mi; }
   .altina .grp > .sq:last-child { grid-area: pl; }
   .altina .sbox { grid-area: box; flex-direction: row; gap: 8px; background: none; border: 0; min-width: 0; padding: 0; align-items: baseline; }
@@ -214,7 +214,7 @@
   font-size: 22px; display: grid; place-items: center; flex: none; line-height: 1;
 }
 /* selo grande de premio sobre a cartela */
-.altina .seal { position: absolute; inset: 0; display: none; place-items: center; z-index: 4; pointer-events: none; padding: 6px; }
+.altina .seal { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: none; place-items: center; z-index: 4; pointer-events: none; padding: 6px; }
 .altina .seal.on { display: grid; }
 .altina .seal .st {
   max-width: 94%; padding: 6px 16px; border-radius: 18px; background: var(--gold); color: var(--ink); text-align: center;
@@ -229,21 +229,22 @@
 .altina .falta.on { display: block; animation: pulse 0.9s ease-in-out infinite alternate; }
 .altina .offtag { display: none; margin-left: auto; font-weight: 800; font-size: 20px; color: #333; white-space: nowrap; }
 .altina .card.off .offtag { display: inline; }
-.altina .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; }
+.altina .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); grid-gap: 3px; gap: 3px; }
 .altina .cell {
   position: relative; isolation: isolate; display: grid; place-items: center; min-width: 0; min-height: 0;
   font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  font-size: var(--cellfs, 20px);
   font-size: clamp(20px, calc(((100cqh - var(--gap)) / 2 - 62px) / 3 * .66), var(--cellfs));
   background: #fff; border: 2px solid #d8c88d; border-radius: 8px; color: var(--ink);
 }
 .altina .cards { container-type: size; }
 .altina .cell { container-type: size; }
-.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94cqmin; height: 94cqmin; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
+.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; height: 94%; width: 94cqmin; height: 94cqmin; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
 .altina .cell.mk { color: #fff; border-color: transparent; background: #fff4; }
 .altina .cell.mk::before { opacity: 1; transform: none; }
 .altina .cell.mk.nw::before { animation: stamp .15s ease-out; }
 .altina .cell.miss { background: #ffb300; border-color: #000; border-style: dashed; color: #000; }
-.altina .cell.miss::after { content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 8px; background: var(--yellow); animation: pulse .8s ease-in-out infinite alternate; }
+.altina .cell.miss::after { content: ""; position: absolute; top: -2px; right: -2px; bottom: -2px; left: -2px; z-index: -1; border-radius: 8px; background: var(--yellow); animation: pulse .8s ease-in-out infinite alternate; }
 .altina .card.flash { animation: flash .5s ease-out; }
 @keyframes stamp { from { transform: scale(.4); opacity: .4; } to { transform: none; opacity: 1; } }
 @keyframes pulse { from { opacity: .45; } to { opacity: 1; } }
@@ -251,11 +252,11 @@
 
 /* ---------- dialogos: cabecalho e rodape fixos, FECHAR sempre visivel ---------- */
 .altina .layer {
-  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 12px;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; display: grid; place-items: center; padding: 12px;
   background: rgba(2, 20, 12, .78);
 }
 .altina .dlg {
-  position: relative; z-index: 51; width: min(760px, 100%); max-height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
+  position: relative; z-index: 51; width: 100%; max-width: 760px; width: min(760px, 100%); max-height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
   background: linear-gradient(180deg, var(--g700), var(--g900)); border: 4px solid var(--gold); border-radius: 22px;
   padding: 16px; box-shadow: 0 10px 30px #000a;
 }
@@ -273,13 +274,13 @@
 .altina .mailay .dlg { border-color: var(--yellow); }
 
 /* premios (com desenhos) */
-.altina .ptable { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.altina .ptable { display: grid; grid-template-columns: 1fr; grid-gap: 6px; gap: 6px; }
 @media (min-width: 900px) { .altina .ptable { grid-template-columns: 1fr 1fr; } }
 .altina .prow { display: flex; align-items: center; gap: 12px; padding: 4px 10px; border-radius: 14px; background: #0006; border: 2px solid #ffffff22; min-height: 56px; }
 .altina .prow .pn { flex: 1; min-width: 0; font-weight: 900; font-size: var(--fs-l); line-height: 1.1; }
 .altina .prow .pn small { display: block; font-size: var(--fs); color: var(--txt-dim); font-weight: 700; }
 .altina .prow .pv { font-weight: 900; font-size: calc(26px * var(--ts)); color: var(--gold); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.altina .mini { display: grid; grid-template-columns: repeat(5, 14px); grid-template-rows: repeat(3, 14px); gap: 2px; flex: none; }
+.altina .mini { display: grid; grid-template-columns: repeat(5, 14px); grid-template-rows: repeat(3, 14px); grid-gap: 2px; gap: 2px; flex: none; }
 .altina .mini i { background: #ffffff2a; border-radius: 3px; }
 .altina .mini i.x { background: var(--gold); }
 .altina .prow.jk { border-color: var(--gold); }
@@ -299,23 +300,23 @@
 .altina .trow .tg { flex: 0 0 150px; padding: 4px 6px; }
 .altina .vol { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 10px; border-radius: 14px; background: #0006; }
 .altina .vol .lab { flex: 0 0 100%; font-weight: 800; }
-.altina .meter { flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 28px; }
+.altina .meter { flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); grid-gap: 3px; gap: 3px; height: 28px; }
 .altina .meter i { background: #ffffff22; border-radius: 3px; }
 .altina .meter i.on { background: var(--gold); }
 
 /* presente / correio / celebracao */
 .altina .gift-ic { display: grid; place-items: center; }
-.altina .gift-ic svg { width: 96px; height: 96px; }
+.altina .gift-ic svg { width: 96px; height: 96px; display: block; }
 .altina .dlg-body .gift-ic, .altina .dlg-body h2, .altina .dlg-body .bigprize { flex: none; }
-.altina .bigprize { font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1.12; font-variant-numeric: tabular-nums; }
+.altina .bigprize { font-size: calc(56px * var(--ts)); font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1.12; font-variant-numeric: tabular-nums; }
 .altina .celeb { position: relative; text-align: center; }
 .altina .celeb .big {
-  font-size: min(calc(72px * var(--ts)), 15vw); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
+  font-size: calc(72px * var(--ts)); font-size: min(calc(72px * var(--ts)), 15vw); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
   animation: bump .7s ease-out both; letter-spacing: .02em;
 }
-.altina .celeb .big.sm { font-size: min(calc(44px * var(--ts)), 11vw); }
+.altina .celeb .big.sm { font-size: calc(44px * var(--ts)); font-size: min(calc(44px * var(--ts)), 11vw); }
 .altina .celeb .sub { font-size: var(--fs-xl); font-weight: 800; }
-.altina .confetti { position: fixed; inset: 0; z-index: 49; pointer-events: none; overflow: hidden; }
+.altina .confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 49; pointer-events: none; overflow: hidden; }
 .altina .confetti i {
   position: absolute; left: 0; top: 0; width: 14px; height: 22px; border-radius: 3px; opacity: 0;
   background: var(--k, #ffd24a);
@@ -331,11 +332,11 @@
 
 /* ---------- splash ---------- */
 .altina .splash {
-  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
   padding: 16px; text-align: center;
   background: radial-gradient(ellipse at 50% 30%, var(--g600) 0%, transparent 65%), linear-gradient(180deg, var(--g800), var(--g950));
 }
-.altina .splash .logo { font-size: clamp(40px, 9vmin, 84px); justify-content: center; padding: 8px 16px; flex-direction: column; text-align: center; }
+.altina .splash .logo { font-size: 56px; font-size: clamp(40px, 9vmin, 84px); justify-content: center; padding: 8px 16px; flex-direction: column; text-align: center; }
 .altina .splash .logo svg { width: 1.6em; height: 1.6em; }
 .altina .splash .logo .lt { align-items: center; }
 .altina .splash .greet { font-size: calc(28px * var(--ts)); font-weight: 800; max-width: 22em; }
@@ -347,7 +348,7 @@
 .altina .dots i.on { background: var(--gold); }
 .altina .pinmsg { min-height: 1.2em; }
 .altina .dlg-foot { margin-top: 2px; }
-.altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: min(360px, 100%); margin: 0 auto; }
+.altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); grid-gap: 12px; gap: 12px; width: 100%; max-width: 360px; width: min(360px, 100%); margin: 0 auto; }
 .altina .keys .btn { min-height: 68px; font-size: calc(32px * var(--ts)); }
 .altina .adm pre, .altina .adm textarea {
   width: 100%; margin: 0; max-height: 18vh; min-height: 72px; overflow: auto; padding: 8px; border-radius: 10px; background: #000a; color: #d8ffe4;
@@ -358,8 +359,8 @@
 /* ---------- retrato / celular ---------- */
 @media (orientation: portrait) {
   .altina .ballsec { grid-template-columns: auto auto; justify-content: center; }
-  .altina .trail { width: min(100%, 620px); justify-self: center; }
-  .altina .xpanel { width: min(100%, 620px); justify-self: center; }
+  .altina .trail { width: 100%; max-width: 620px; width: min(100%, 620px); justify-self: center; }
+  .altina .xpanel { width: 100%; max-width: 620px; width: min(100%, 620px); justify-self: center; }
   .altina .ptab { flex-direction: row; align-items: center; gap: 10px; padding: 4px 8px; }
   .altina .ptab .ph { flex: none; padding: 0; }
   .altina .prows { display: flex; flex: 1; gap: 8px; align-content: normal; }
@@ -369,15 +370,17 @@
 }
 @media (orientation: portrait) and (max-width: 599px) {
   .altina .ballsec, .altina .trail { display: none; }
-  .altina .strip { display: grid; gap: 6px; }
+  .altina .strip { display: grid; grid-gap: 6px; gap: 6px; }
   .altina.x-on .strip, .altina.x-on .ptab { display: none; }
   .altina .bar { align-items: stretch; }
-  .altina .bar .rowa, .altina .bar .rowb, .altina .xrow { gap: 12px; }
+  .altina .xrow { gap: 12px; }
   .altina.ts-grande { --ts: 1.06; --tsb: 1.03; }
   .altina.ts-muito { --ts: 1.12; --tsb: 1.05; }
   .altina .stat { max-width: none; min-height: 0; padding: 2px 8px; }
-  .altina .stat .val { font-size: calc(26px * var(--ts)); }
+  .altina .stat .val { font-size: 24px; }
   .altina .top .btn.icon { width: 64px; height: 64px; }
+  .altina .logo { padding: 0; justify-content: center; }
+  .altina .logo svg { width: 48px; height: 48px; }
   .altina .caption { font-size: calc(21px * var(--ts)); line-height: 1.05; }
   .altina .mailb { width: 100%; height: 64px; display: flex; gap: 10px; justify-content: center; align-items: center; border-radius: 18px; }
   .altina .mailb { padding-right: 26px; }
@@ -427,7 +430,7 @@
 /* Tablets deitados mais baixos (ex.: 960x600, 1024x600, 1280x720):
    tabela de premios em 2x2 para nao invadir a barra de baixo. */
 @media (orientation: landscape) and (max-height: 780px) {
-  .altina .prows { grid-template-columns: 1fr 1fr; column-gap: 6px; align-content: center; }
+  .altina .prows { grid-template-columns: 1fr 1fr; grid-column-gap: 6px; column-gap: 6px; align-content: center; }
   .altina .pr { min-height: 34px; padding: 2px 8px; font-size: calc(22px * var(--ts)); }
   .altina .tr-main, .altina .tr-extra { gap: 2px; }
   .altina .trail { gap: 6px; }
@@ -449,13 +452,12 @@
 /* Celular baixo (ex.: 375x667): sobra altura para as cartelas ficarem legiveis */
 @media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
   .altina { --gap: 6px; --pad: 6px; }
-  .altina .strip { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 4px 6px; }
+  .altina .strip { grid-template-columns: auto minmax(0, 1fr); align-items: center; grid-gap: 8px; gap: 8px; padding: 4px 6px; }
   .altina .strip .counter { font-size: calc(22px * var(--ts)); white-space: nowrap; }
   .altina .strip .srow { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .altina .strip .srow .tc:nth-child(-n+4) { display: none; }
   .altina .card-head { min-height: 26px; }
   .altina .card-num { width: 24px; height: 24px; }
-  .altina .bar .rowa, .altina .bar .rowb { gap: 8px; }
   .altina .btn.g-play, .altina .bar .rowb .btn { min-height: 68px; }
   .altina .grp { gap: 2px 10px; }
 }
@@ -472,7 +474,6 @@
 /* texto "Grande/Muito grande": numeros do topo e contador nao cortam embaixo */
 .altina.ts-grande .stat .val, .altina.ts-grande .counter, .altina.ts-muito .stat .val, .altina.ts-muito .counter { line-height: 1.12; }
 @media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
-  .altina .bar .rowa, .altina .bar .rowb { gap: 12px; }
   .altina .grp { gap: 2px 12px; }
   .altina .card-head { min-height: 24px; }
 }
@@ -510,9 +511,245 @@
 }
 /* tablet em pe estreito com correio: o trevo do topo sai para "Acumulado" caber */
 @media (orientation: portrait) and (min-width: 600px) and (max-width: 720px) {
-  .altina.has-mail .top .logo { display: none; }
+  .altina.has-mail .top > * + * { margin-left: 8px; }
+  .altina.has-mail .top .mailb, .altina.has-mail .top .snd, .altina.has-mail .top .gear { margin-left: 12px; width: 64px; height: 64px; }
+  .altina.has-mail .top .mailb svg { width: 40px; height: 40px; }
+  .altina.has-mail .top .btn.icon { width: 64px; height: 64px; }
+  .altina.has-mail .stat .val { font-size: 26px; }
+  .altina.has-mail .stat { flex: 1 1 100px; }
 }
 /* celular: texto grande/muito grande sem apertar as cartelas (os numeros das cartelas ja usam o maximo) */
 @media (orientation: portrait) and (max-width: 599px) and (max-height: 820px) {
   .altina.ts-grande, .altina.ts-muito { --ts: 1; --tsb: 1; }
+}
+
+/* ================= v3: celular deitado (paisagem, altura <= 500px) ================= */
+@media (orientation: landscape) and (max-height: 500px) {
+  .altina .ballsec, .altina .trail { display: none; }
+  /* topo: logo (so o trevo em telas estreitas), saldo, acumulado, correio, som, ajustes */
+  .altina .top > * + * { margin-left: 8px; }
+  .altina .top .mailb, .altina .top .snd, .altina .top .gear { margin-left: 12px; }
+  .altina .logo { font-size: 22px; padding: 0 2px; }
+  .altina .logo svg { width: 44px; height: 44px; }
+  .altina .logo .lt { display: none; }
+  .altina .stat { min-height: 0; height: 58px; padding: 0 8px; flex: 1 1 110px; max-width: 230px; }
+  .altina .stat .val { font-size: 26px; }
+  .altina .btn.icon { width: 64px; height: 64px; }
+  .altina .mailb { width: 64px; height: 64px; border-width: 3px; border-radius: 16px; }
+  .altina .mailb svg { width: 38px; height: 38px; }
+  .altina .mailb .clv { font-size: 22px; right: -6px; top: -8px; }
+  /* faixa: contador + 6 ultimas bolas */
+  .altina .strip { grid-template-columns: minmax(0, 1fr); grid-gap: 2px; gap: 2px; padding: 2px 4px; align-content: center; }
+  .altina .strip .counter { font-size: 20px; line-height: 1.1; text-align: center; white-space: nowrap; }
+  .altina .strip .srow { grid-template-columns: repeat(6, 30px); justify-content: space-between; grid-gap: 0; gap: 0; }
+  .altina .strip .srow .tc:nth-child(-n+4) { display: none; }
+  .altina .strip .tc { width: 30px; height: 30px; max-width: none; aspect-ratio: auto; font-size: 20px; letter-spacing: -.06em; border-width: 1px; }
+  .altina .strip .tc.last { box-shadow: 0 0 0 2px var(--gold); }
+  /* tabela de premios 2x2, nomes curtos */
+  .altina .ptab { padding: 3px 4px; min-height: 64px; }
+  .altina .ptab .ph { display: none; }
+  .altina .prows { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; grid-column-gap: 4px; column-gap: 4px; grid-row-gap: 3px; row-gap: 3px; align-content: stretch; }
+  .altina .pr { min-height: 0; padding: 0 5px; font-size: 20px; gap: 3px; }
+  .altina .pr .full { display: none; }
+  .altina .pr .short { display: inline; }
+  .altina .ptab.many .pr:nth-child(-n+4) { display: none; } /* conjunto Variado: aqui so os 4 maiores; tocar abre todos */
+  /* cartelas */
+  .altina .card { border-width: 3px; padding: 1px 3px 3px; border-radius: 12px; }
+  .altina .card-head { min-height: 22px; margin-bottom: 1px; }
+  .altina .card-num { width: 22px; height: 22px; font-size: 20px; }
+  .altina .card.has-falta .card-num { display: none; }
+  .altina .falta { white-space: nowrap; letter-spacing: -.04em; padding: 0 2px; line-height: 1.1; }
+  .altina .falta .full { display: none; }
+  .altina .falta .short { display: inline; }
+  .altina .offtag { font-size: 20px; }
+  .altina .grid { grid-gap: 2px; gap: 2px; }
+  .altina .cell { border-width: 1px; border-radius: 5px; font-size: 20px; }
+  .altina .cell::before { width: 100%; height: 100%; border-radius: 5px; }
+  .altina .seal .st { font-size: 20px; padding: 2px 8px; border-width: 3px; border-radius: 12px; }
+  /* barra: aposta e cartelas sob as cartelas; Numeros/Turbo/JOGAR na coluna da direita */
+  .altina .sbox { min-width: 0; padding: 0 2px; }
+  .altina .sbox .l2 { font-size: 28px; }
+  .altina .bar .btn.sec { min-width: 0; font-size: 20px; padding: 2px 4px; letter-spacing: -.02em; }
+  .altina .g-turbo .ti { display: none; }
+  .altina .g-turbo .tt { align-items: center; }
+  .altina .btn.g-play { font-size: 28px; line-height: 1; letter-spacing: 0; padding: 2px 4px; min-height: 64px; }
+  .altina .g-play .ps { font-size: 20px; }
+  /* painel de bola extra no lugar da faixa + tabela */
+  .altina .xpanel { padding: 3px 4px; border-width: 3px; border-radius: 14px; justify-content: space-between; }
+  .altina .xtitle { font-size: 20px; line-height: 1.1; }
+  .altina .xpanel .btn.big { min-height: 64px; font-size: 20px; padding: 2px 0; letter-spacing: -.03em; }
+  .altina .xrow { gap: 12px; }
+  .altina .xrem { display: none; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 800px) {
+  .altina .logo .lt { display: flex; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (min-height: 400px) {
+  .altina .cell { font-size: 22px; }
+}
+
+/* ================= v3: compatibilidade com Chrome/WebView antigo ================= */
+/* sem aspect-ratio: as casas do trilho ficam redondas por altura calculada */
+@supports not (aspect-ratio: 1 / 1) {
+  .altina .tc { height: calc((var(--panelw) - 44px) / 10); }
+}
+@media (orientation: portrait) {
+  @supports not (aspect-ratio: 1 / 1) {
+    .altina .tc { height: var(--tcs, 36px); }
+    .altina .strip .tc { height: 32px; }
+  }
+}
+/* sem `gap` em flex (Chrome < 84): margens (a classe .nogap e posta por src/ui/index.ts) */
+.altina.nogap .btn > * + * { margin-left: 8px; }
+.altina.nogap .logo > * + * { margin-left: 6px; }
+.altina.nogap .binfo > * + *, .altina.nogap .ptab > * + *, .altina.nogap .xpanel > * + *, .altina.nogap .btn.g-play > * + *,
+.altina.nogap .dlg > * + *, .altina.nogap .dlg-head > * + *, .altina.nogap .dlg-body > * + *, .altina.nogap .stack > * + *,
+.altina.nogap .pane > * + *, .altina.nogap .sset > * + *, .altina.nogap .splash > * + * { margin-top: 12px; }
+.altina.nogap .xrow > * + *, .altina.nogap .grp > * + *, .altina.nogap .dlg-foot > * + *, .altina.nogap .tabs > * + *,
+.altina.nogap .seg > * + *, .altina.nogap .trow > * + *, .altina.nogap .vol > * + *, .altina.nogap .prow > * + *,
+.altina.nogap .card-head > * + *, .altina.nogap .pr > * + * { margin-left: 8px; }
+.altina.nogap .dlg .row > * { margin: 0 12px 12px 0; }
+.altina.nogap .dots > * + * { margin-left: 14px; }
+.altina.nogap .mailb > * + * { margin-left: 10px; }
+
+/* ================= v3: Ajustes (botao do painel), PIN e painel do neto ================= */
+.altina .btn.ghost { background: transparent; color: var(--txt-dim); border: 2px dashed #ffffff55; box-shadow: none; font-weight: 700; }
+.altina .arow .btn { flex: 1 1 auto; width: 100%; }
+.altina .arow { padding: 6px; }
+
+/* teclado do PIN (dialogo e aba "PIN") */
+.altina .pinbox { display: flex; flex-direction: column; align-items: center; }
+.altina .pinbox > * + *, .altina .pinp > * + * { margin-top: 10px; }
+.altina .pinl { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.altina .pinl > * + * { margin-top: 6px; }
+.altina .pint { font-size: calc(24px * var(--ts)); font-weight: 900; color: var(--gold-l); text-align: center; line-height: 1.1; }
+.altina .pinmsg, .altina .amsg { min-height: 1.2em; font-size: var(--fs); color: var(--gold-l); text-align: center; margin: 0; line-height: 1.15; }
+.altina .keys .btn { min-height: 64px; }
+.altina .keys .kgap { display: block; }
+.altina .dots { min-height: 30px; }
+.altina .dots i { width: 26px; height: 26px; }
+
+/* painel do neto */
+.altina .dlg.adm { max-width: 1000px; width: min(1000px, 100%); }
+.altina .adm .admt { margin: 0; }
+.altina .adm .tabs .tab { min-width: 0; }
+.altina .adm .dlg-body { overflow: hidden; }
+.altina .dlg .apane { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+.altina .pgs { min-width: 0; }
+.altina .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-gap: 6px; gap: 6px; align-content: start; }
+.altina .tile { display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 4px 10px; border-radius: 12px; background: #0006; border: 2px solid #ffffff22; }
+.altina .tile .tl, .altina .abox .tl { font-size: 20px; font-weight: 700; color: var(--txt-dim); line-height: 1.15; white-space: nowrap; overflow: hidden; }
+.altina .tile .tv { font-size: 24px; font-weight: 900; color: var(--txt); line-height: 1.15; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.altina .abox { display: flex; flex-direction: column; min-width: 0; padding: 4px 10px; border-radius: 12px; background: #0006; border: 2px solid #ffffff22; }
+.altina .abox .tv.sm { font-size: 20px; font-weight: 800; color: var(--txt); line-height: 1.2; overflow-wrap: anywhere; }
+.altina .rpg > * + * { margin-top: 6px; }
+.altina .amsg { padding: 4px 0; }
+/* grupos de escolha (Jogo) */
+.altina .jpg > * + * { margin-top: 12px; }
+.altina .gbox { display: flex; align-items: center; padding: 6px 8px; border-radius: 14px; background: #0006; min-width: 0; }
+.altina .gbox .gl { flex: 0 0 160px; margin: 0 10px 0 0; font-size: 20px; font-weight: 900; line-height: 1.15; color: var(--gold-l); }
+.altina .gbox .seg { flex: 1 1 0; min-width: 0; }
+.altina .opt { flex: 1 1 0; min-width: 0; padding: 4px 6px; flex-direction: column; line-height: 1.1; }
+.altina .opt .std { display: block; font-size: 20px; font-weight: 700; opacity: .8; }
+.altina .jrest .opt { width: 100%; }
+.altina .anote { font-size: 20px; font-weight: 700; color: var(--txt-dim); text-align: center; line-height: 1.15; }
+.altina .anote.ok { color: var(--gold); }
+.altina .brow { display: flex; }
+.altina .brow > * + * { margin-left: 12px; }
+.altina .brow .opt { flex: 1 1 0; }
+.altina .apg > * + * { margin-top: 8px; }
+.altina .atext { display: block; width: 100%; height: 64px; min-height: 64px; margin: 0; resize: none; overflow: auto; padding: 8px; border-radius: 10px; background: #000a; color: #d8ffe4; font: 20px/1.3 ui-monospace, Menlo, Consolas, monospace; border: 2px solid #ffffff33; -webkit-user-select: text; user-select: text; }
+.altina .pinp { display: flex; flex-direction: column; align-items: center; }
+/* paginas: so uma por vez em telas pequenas */
+.altina .adm .pager { display: none; align-items: stretch; }
+.altina .adm .pager > * + * { margin-left: 12px; }
+.altina .adm .pgb { flex: 1 1 0; font-size: 28px; }
+.altina .adm .pgl { flex: 0 0 auto; align-self: center; min-width: 84px; text-align: center; font-weight: 900; font-size: 22px; color: var(--gold-l); }
+@media (max-height: 759px), (max-width: 739px) {
+  .altina .adm .pg:not(.cur) { display: none; }
+  .altina .adm .pager { display: flex; }
+  .altina .adm .admt { display: none; }
+}
+/* telas grandes: tudo junto, rotulo ao lado dos botoes */
+@media (min-height: 760px) and (min-width: 740px) {
+  .altina .p-resumo .pgs, .altina .p-jogo .pgs, .altina .p-aparelho .pgs { display: grid; grid-template-columns: 1fr 1fr; grid-gap: 8px 12px; gap: 8px 12px; align-items: start; }
+  .altina .p-jogo .jrest { grid-column: 1 / -1; }
+  .altina .p-pin .pinp { flex-direction: row; justify-content: center; align-items: center; }
+  .altina .p-pin .pinp > * + * { margin-top: 0; margin-left: 40px; }
+  .altina .p-pin .pinl { flex: 0 0 280px; }
+}
+/* telas estreitas: rotulo em cima */
+@media (max-width: 599px) {
+  .altina .gbox { flex-direction: column; align-items: stretch; padding: 4px 6px; }
+  .altina .gbox .gl { flex: none; margin: 0 0 4px; }
+  .altina .adm .tabs { display: flex; flex-wrap: wrap; }
+  .altina .adm .tabs .tab { flex: 1 1 40%; margin: 0 0 12px; }
+  .altina .adm .tabs .tab:nth-child(n+3) { margin-bottom: 0; }
+  .altina .adm .tabs .tab:nth-child(even) { margin-left: 12px; }
+  .altina .tiles { grid-template-columns: 1fr 1fr; }
+}
+
+/* ================= v3: dialogos no celular deitado (cabecalho com FECHAR na mesma linha) ================= */
+@media (orientation: landscape) and (max-height: 500px) {
+  .altina .layer { padding: 4px; }
+  .altina .dlg { padding: 6px 8px; border-width: 3px; border-radius: 16px; }
+  .altina .dlg { gap: 6px; }
+  .altina .dlg.hrow {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-gap: 12px 12px; gap: 12px 12px;
+    grid-template-areas: "head foot" "body body";
+  }
+  .altina .dlg.hrow > * + * { margin-top: 0; }
+  .altina .dlg.hrow .dlg-head { grid-area: head; flex-direction: row; align-items: center; min-width: 0; }
+  .altina .dlg.hrow .dlg-body { grid-area: body; padding-bottom: 0; }
+  .altina .dlg.hrow .dlg-foot { grid-area: foot; }
+  .altina .dlg.hrow .dlg-foot .btn { width: auto; min-width: 124px; }
+  .altina .dlg.hrow h2 { font-size: 28px; text-align: left; flex: none; margin-right: 12px; }
+  .altina .dlg.hrow .dlg-head p { font-size: 20px; text-align: left; }
+  .altina .dlg.hrow .tabs { flex: 1 1 0; min-width: 0; }
+  .altina .dlg.hrow .tabs .tab { padding: 2px 4px; }
+  /* Ajustes: so as abas na cabecalho */
+  .altina .dlg.hrow:not(.pindlg):not(.adm) .dlg-head > h2 { display: none; }
+  .altina .dlg.hrow .pane { grid-gap: 6px; gap: 6px; }
+  .altina .sset { padding: 6px 8px; }
+  .altina .sset { gap: 4px; }
+  .altina .trow { padding: 4px 4px 4px 10px; }
+  .altina .vol { padding: 4px 8px; }
+  /* premios: 2 colunas */
+  .altina .ptable { grid-template-columns: 1fr 1fr; grid-gap: 6px; gap: 6px; }
+  .altina .prow { min-height: 44px; padding: 2px 8px; }
+  .altina .prow .pn { font-size: 22px; line-height: 1.05; }
+  .altina .prow .pn small, .altina .prow.jk .pn small { display: none; }
+  .altina .prow .pv { font-size: 24px; }
+  .altina .mini { grid-template-columns: repeat(5, 12px); grid-template-rows: repeat(3, 12px); }
+  .altina .dlg-body > .prow.jk { margin-top: 0; }
+  /* presente, correio, celebracao: compactos */
+  .altina .gift-ic svg { width: 56px; height: 56px; }
+  .altina .bigprize { font-size: 36px; line-height: 1.25; }
+  .altina .celeb .big { line-height: 1.2; }
+  .altina .dlg h2 { line-height: 1.25; }
+  .altina .celeb .big { font-size: 44px; }
+  .altina .celeb .big.sm { font-size: 34px; }
+  .altina .celeb .sub { font-size: 24px; }
+  .altina .dlg h2 { font-size: 28px; }
+  .altina .dlg p { font-size: 22px; }
+  .altina .btn.big { min-height: 64px; }
+  .altina .dlg-body { padding-bottom: 0; }
+  .altina .dlg-body { gap: 4px; }
+  /* PIN: teclado 6x2 */
+  .altina .keys { grid-template-columns: repeat(6, 64px); grid-gap: 12px; gap: 12px; justify-content: center; width: auto; max-width: none; }
+  .altina .keys .kgap { order: 99; }
+  .altina .pinbox > * + * { margin-top: 6px; }
+  .altina .pinp > * + * { margin-top: 6px; }
+  .altina .pinl > * + * { margin-top: 2px; }
+  .altina .pinmsg { min-height: 24px; }
+  .altina .pint { font-size: 22px; }
+  .altina .dots { min-height: 28px; }
+  /* painel do neto */
+  .altina .adm .tabs .tab { flex: 1 1 0; margin: 0; }
+  .altina .gbox { padding: 2px 6px; }
+  .altina .gbox .gl { flex-basis: 150px; }
+  .altina .jpg > * + * { margin-top: 8px; }
+  .altina .adm .pgl { font-size: 22px; }
+  .altina .adm .pager { margin-top: 6px; }
+  .altina .tile { padding: 2px 8px; }
 }

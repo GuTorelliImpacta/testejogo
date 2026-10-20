@@ -1,12 +1,15 @@
-// QA v2: auditoria de layout no APP REAL (estados forçados via localStorage) em 5 viewports.
+// QA v3: auditoria de layout no APP REAL (estados forçados via localStorage) nos 25 viewports da seção 1.5 da SPEC-v3 (QA_VP troca a lista).
 // Mede: rolagem, alvos < 64 px, texto < 20 px, espaçamento < 12 px, diálogos sem rolagem/FECHAR visível, cortes, sobreposição.
 // Uso: npx tsx tests/e2e/qa/layout.ts [estado,estado]   (SHOT=docs/qa salva review2-<estado>-<WxH>.png)
 import { mkdirSync } from 'node:fs';
-import { VIEWPORTS, baseSave, blankRound, fillers, mkPlan, nearBingo, nearDouble, today, withRound } from './fixtures';
+import { VIEWPORTS as ENV_VIEWPORTS, baseSave, blankRound, fillers, mkPlan, nearBingo, nearDouble, today, withRound } from './fixtures';
 import { audit, launch, open } from './browser';
 import type { Page } from '@playwright/test';
 import type { SaveData } from '../../../src/types';
 
+/** SPEC-v3 1.5: os 25 viewports obrigatórios (QA_VP="1180x820,390x844" troca a lista). */
+const QA_VP = '1280x800,800x1280,1024x768,768x1024,960x600,600x960,1024x600,600x1024,1280x720,1366x768,1180x820,820x1180,1366x1024,1920x1080,1920x1200,360x740,375x667,390x844,412x915,430x932,740x360,667x375,844x390,915x412,932x430';
+const VIEWPORTS = process.env.QA_VP ? ENV_VIEWPORTS : QA_VP.split(',').map((x) => { const [w, h] = x.split('x').map(Number); return { w, h }; });
 const only = process.argv[2]?.split(',');
 const SHOT = process.env.SHOT;
 const ALL_SHOTS = new Set(['idle', 'mail-arrived', 'mail-open', 'drawing', 'drawing-line', 'extra', 'extra-free', 'celebracao-dupla', 'celebracao-bingo', 'gift', 'prizes', 'settings']);
@@ -34,9 +37,38 @@ function lineEarly(): SaveData {
   return withRound(s, plan, { mainIdx: 9, credits: 980 });
 }
 
+/** SPEC-v3 1.3: tudo visível e tocável sem rolar (só em tela de jogo, sem diálogo aberto). */
+async function presence(p: Page, label: string): Promise<string[]> {
+  return p.evaluate((label) => {
+    const out: string[] = [];
+    const vw = innerWidth, vh = innerHeight;
+    const vis = (e: Element) => {
+      const r = e.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return false;
+      for (let q: Element | null = e; q; q = q.parentElement) { const cs = getComputedStyle(q); if (cs.display === 'none' || cs.visibility === 'hidden') return false; }
+      return true;
+    };
+    if (document.querySelector('.layer:not(.hide)') || document.querySelector('.splash:not(.hide)')) return out;
+    const xOn = !!document.querySelector('.altina.x-on');
+    const need = ['.logo', '.cred', '.jack', '.snd', '.gear', '.g-bet', '.g-cards', '.g-nums', '.g-turbo', '.g-play'];
+    if (xOn) need.push('.xpanel', '.xbuy', '.xend'); else need.push('.counter', '.ptab', '.strip, .trail');
+    for (const sel of need) {
+      const list = [...document.querySelectorAll(sel)].filter(vis);
+      if (!list.length) out.push(`AUSENTE ${sel}`);
+      else for (const e of list) { const r = e.getBoundingClientRect(); if (r.right > vw + 1 || r.bottom > vh + 1 || r.left < -1 || r.top < -1) out.push(`FORA DA TELA ${sel}`); }
+    }
+    if ([...document.querySelectorAll('.card')].filter(vis).length !== 4) out.push('AUSENTE 4 cartelas');
+    return out.map((o) => `[${label}] ${o}`);
+  }, label);
+}
+
 type State = [string, () => SaveData | null, (p: Page) => Promise<void>];
 const gear = async (p: Page) => { await p.locator('.top .gear').click(); await p.waitForTimeout(350); };
 const pin = async (p: Page) => { for (let i = 0; i < 5; i++) await p.locator('.top .logo').click(); await p.waitForTimeout(350); };
+const keys = async (p: Page, root: string, ks: string) => { for (const k of ks) await p.locator(`${root} .keys button`, { hasText: new RegExp(`^${k}$`) }).click(); await p.waitForTimeout(300); };
+const login = async (p: Page) => { await ent(p); await pin(p); await keys(p, '.pindlg', '1958'); await p.waitForTimeout(300); };
+const tab = async (p: Page, t: string, page = 1) => { await p.locator(`.adm .tab[data-tab="${t}"]`).click(); await p.waitForTimeout(250); for (let i = 1; i < page; i++) await p.locator(`.adm .p-${t} .pgb`).nth(1).click(); await p.waitForTimeout(250); };
+const settingsTela = async (p: Page) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(2).click(); await p.waitForTimeout(300); };
 const ent = async (p: Page, ms = 400) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(ms); };
 
 const STATES: State[] = [
@@ -70,8 +102,7 @@ const STATES: State[] = [
   ['prizes-bet1', () => { const s = baseSave(); s.bet = 1; return s; }, async (p) => { await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500); }],
   ['prizes-variado', () => baseSave(), async (p) => {
     await ent(p); await pin(p);
-    for (const k of '1958') await p.locator('.keys button', { hasText: new RegExp(`^${k}$`) }).click();
-    await p.waitForTimeout(300);
+    await keys(p, '.pindlg', '1958');
     await p.evaluate(() => { localStorage.setItem('altina-da-sorte:patternSet', 'variado'); });
     await p.reload(); await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500);
   }],
@@ -79,7 +110,20 @@ const STATES: State[] = [
   ['settings-jogo', () => baseSave(), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(1).click(); await p.waitForTimeout(300); }],
   ['settings-tela', () => baseSave(), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(2).click(); await p.waitForTimeout(300); }],
   ['pin', () => baseSave(), async (p) => { await ent(p); await pin(p); }],
-  ['admin', () => baseSave(), async (p) => { await ent(p); await pin(p); for (const k of '1958') await p.locator('.keys button', { hasText: new RegExp(`^${k}$`) }).click(); await p.waitForTimeout(500); }],
+  ['admin', () => baseSave(), login],
+  ['admin-resumo-2', () => baseSave(), async (p) => { await login(p); await tab(p, 'resumo', 2); }],
+  ['admin-resumo-4', () => baseSave(), async (p) => { await login(p); await tab(p, 'resumo', 4); }],
+  ['admin-jogo', () => baseSave(), async (p) => { await login(p); await tab(p, 'jogo'); }],
+  ['admin-jogo-3', () => baseSave(), async (p) => { await login(p); await tab(p, 'jogo', 3); }],
+  ['admin-jogo-5', () => baseSave(), async (p) => { await login(p); await tab(p, 'jogo', 5); }],
+  ['admin-pin', () => baseSave(), async (p) => { await login(p); await tab(p, 'pin'); }],
+  ['admin-pin-2', () => baseSave(), async (p) => { await login(p); await tab(p, 'pin'); await keys(p, '.adm', '1958'); }],
+  ['admin-aparelho', () => baseSave(), async (p) => { await login(p); await tab(p, 'aparelho'); }],
+  ['admin-aparelho-3', () => baseSave(), async (p) => { await login(p); await tab(p, 'aparelho', 3); }],
+  ['admin-aparelho-4', () => baseSave(), async (p) => { await login(p); await tab(p, 'aparelho', 4); }],
+  ['settings-painel', () => baseSave(), async (p) => { await settingsTela(p); }],
+  ['settings-painel-pin', () => baseSave(), async (p) => { await settingsTela(p); await p.locator('.arow .btn').click(); await p.waitForTimeout(350); }],
+  ['idle-variado', () => { const s = baseSave(); s.tuning = { ...s.tuning, conjuntoPadroes: 'variado' }; return s; }, (p) => ent(p, 600)],
   ['idle-textogrande', () => grande(baseSave()), (p) => ent(p, 600)],
   ['idle-textomuito', () => muito(baseSave()), (p) => ent(p, 600)],
   ['mail-open-textomuito', () => muito(withMail(baseSave())), async (p) => { await ent(p, 500); await p.locator('.mailb').click(); await p.waitForTimeout(600); }],
@@ -87,6 +131,12 @@ const STATES: State[] = [
   ['celebracao-textomuito', () => muito(nearBingo({ mainIdx: 29, turbo: true })), async (p) => { await ent(p, 300); await p.waitForSelector('text=CONTINUAR', { timeout: 20000 }); await p.waitForTimeout(1700); }],
   ['settings-textomuito', () => muito(baseSave()), async (p) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(1).click(); await p.waitForTimeout(300); }],
   ['prizes-textomuito', () => muito(baseSave()), async (p) => { await ent(p); await p.locator('.ptab').click(); await p.waitForTimeout(500); }],
+  ['admin-textomuito', () => muito(baseSave()), login],
+  ['admin-jogo-textomuito', () => muito(baseSave()), async (p) => { await login(p); await tab(p, 'jogo'); }],
+  ['settings-painel-textomuito', () => muito(baseSave()), async (p) => { await settingsTela(p); }],
+  ['pin-textomuito', () => muito(baseSave()), async (p) => { await ent(p); await pin(p); }],
+  ['gift-textomuito', () => { const s = muito(baseSave()); s.credits = 20; return s; }, async (p) => { await ent(p); await p.locator('button.play').click(); await p.waitForSelector('text=PEGAR'); await p.waitForTimeout(500); }],
+  ['idle-7digitos-textomuito', () => muito(big(baseSave())), (p) => ent(p, 900)],
   ['drawing-textomuito', () => muito(blankRound({ mainIdx: 8, credits: 980 })), (p) => ent(p, 900)],
 ];
 
@@ -107,6 +157,7 @@ const STATES: State[] = [
       }
       const res = await audit(c.page, `${vp.w}x${vp.h} ${name}`);
       all.push(...res);
+      all.push(...(await presence(c.page, `${vp.w}x${vp.h} ${name}`)));
       if (SHOT) {
         const wanted = ALL_SHOTS.has(name) || (vp.w === 1280 || vp.w === 360);
         if (wanted) await c.page.screenshot({ path: `${SHOT}/review2-${name}-${vp.w}x${vp.h}.png` });
