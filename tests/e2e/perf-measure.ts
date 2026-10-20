@@ -95,7 +95,7 @@ function parseTrace(buf: Buffer): Task[] {
 async function sceneWindow(page: Page, cdp: CDPSession, label: string, action: () => Promise<void>, settleMs: number, extra?: () => Promise<Record<string, number | string>>): Promise<SceneResult> {
   await page.evaluate(() => { const p = (window as any).__p; p.frames = []; p.long = []; p.ev = []; p.run = true; p.last = 0; });
   if (process.env.PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
-  await (page.context().browser() as any).startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute', 'v8'] });
+  await (page.context().browser() as any).startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute', 'v8', ...(process.env.INVAL ? ['disabled-by-default-devtools.timeline.invalidationTracking'] : [])] });
   const t0 = Date.now();
   await action();
   await page.waitForTimeout(settleMs);

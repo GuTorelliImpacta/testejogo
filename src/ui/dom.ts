@@ -20,7 +20,10 @@ export function setText(e: HTMLElement, s: string): void {
   const c = e as Cached;
   if (c._t !== s) {
     c._t = s;
-    e.textContent = s;
+    // reaproveita o nó de texto (textContent recria o nó e o objeto de layout a cada troca)
+    const t = e.firstChild;
+    if (t && t.nodeType === 3 && !t.nextSibling) t.nodeValue = s;
+    else e.textContent = s;
   }
 }
 

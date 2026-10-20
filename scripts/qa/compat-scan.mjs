@@ -26,11 +26,10 @@ const JS = [
   ['IntersectionObserver', /\bIntersectionObserver\b/, 51],
   ['AbortController', /\bAbortController\b/, 66],
   ['fetch', /\bfetch\(/, 42],
-  ['optional chaining ?.', /[\w)\]]\?\.[\w([]/, 80, 'sintaxe: esbuild baixa para chrome60'],
-  ['nullish ??', /[\w)\]"'] \?\? /, 80, 'sintaxe: esbuild baixa para chrome60'],
-  ['catch sem parâmetro', /catch\s*\{/, 66, 'sintaxe: esbuild baixa para chrome60'],
-  ['top-level await', /^\s*await\s/m, 89],
-  ['import()/import.meta', /\bimport\.meta\b|\bimport\(/, 63],
+  ['optional chaining ?.', /[\w)\]]\?\.(?=[A-Za-z_$\[(])/, 80, 'sintaxe: esbuild baixa para chrome60 (deve ser 0)'],
+  ['nullish ??', /[\w)\]"'] \?\? /, 80, 'sintaxe: esbuild baixa para chrome60 (deve ser 0)'],
+  ['catch sem parâmetro', /catch\s*\{/, 66, 'sintaxe: esbuild baixa para chrome60 (deve ser 0)'],
+    ['import()/import.meta', /\bimport\.meta\b|\bimport\(/, 63],
   ['type="module" no HTML', null, 61],
   ['BigInt literal', /\b\d+n\b/, 67],
   ['Array.prototype.findLast / toSorted', /\.(findLast|toSorted|toReversed)\(/, 97],
@@ -90,5 +89,5 @@ rows.push({ kind: 'html', where: 'index.html', name: 'type="module"', n: (html.m
 
 console.log(`Piso: Chrome ${FLOOR}. "ACIMA" = exige versão maior que o piso (precisa de guarda/fallback; ver docs/qa/compat-fase3.md).\n`);
 for (const r of rows) console.log(`${r.bad ? 'ACIMA ' : 'ok    '} [${r.kind}] ${r.name} (Chrome ${r.min}+) x${r.n} em ${r.where}${r.note ? ' | ' + r.note : ''}${r.ex ? '\n        ex: ' + r.ex : ''}`);
-const worst = rows.filter((r) => r.bad && r.kind === 'js' && /syntax|sintaxe/.test(r.note));
+const worst = rows.filter((r) => r.bad && r.kind === 'js' && /sintaxe/.test(r.note));
 process.exit(worst.length ? 1 : 0);

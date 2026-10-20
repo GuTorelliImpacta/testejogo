@@ -76,11 +76,13 @@ export function createBalls(): BallViews {
 
   const fill = (c: HTMLElement, n: number): void => {
     c.className = `tc${c.classList.contains('xs') ? ' xs' : ''} on r${range(n)}`;
-    c.textContent = String(n);
+    const t = c.firstChild;
+    if (t && t.nodeType === 3) t.nodeValue = String(n);
+    else c.textContent = String(n);
   };
   const clear = (c: HTMLElement): void => {
     c.className = c.classList.contains('xs') ? 'tc xs' : 'tc';
-    c.textContent = '';
+    if (c.firstChild) c.textContent = '';
   };
 
   return {

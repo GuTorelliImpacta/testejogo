@@ -6,7 +6,6 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import WebSocket from 'ws';
 
 const EXE = process.env.OLD_CHROME;
 const BASE = process.env.QA_BASE ?? 'http://localhost:4181';
@@ -21,11 +20,11 @@ for (let i = 0; i < 60; i++) {
   try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); if (targets.find((t) => t.type === 'page')) break; } catch { /* subindo */ }
   await sleep(250);
 }
-const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
-await new Promise((r) => ws.on('open', r));
+const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl); // WebSocket global (Node >= 22)
+await new Promise((r) => ws.addEventListener('open', r));
 let id = 0; const pend = new Map(); const errors = [];
-ws.on('message', (d) => {
-  const m = JSON.parse(d);
+ws.addEventListener('message', (ev) => {
+  const m = JSON.parse(ev.data);
   if (m.id && pend.has(m.id)) { pend.get(m.id)(m); pend.delete(m.id); return; }
   if (m.method === 'Runtime.exceptionThrown') errors.push('EXC ' + (m.params.exceptionDetails.exception?.description ?? m.params.exceptionDetails.text).slice(0, 300));
   if (m.method === 'Runtime.consoleAPICalled' && m.params.type === 'error') errors.push('console.error ' + m.params.args.map((a) => a.value ?? a.description).join(' ').slice(0, 300));
