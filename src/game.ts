@@ -161,6 +161,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     });
   }
 
+  /** Cede a thread principal (uma tarefa a menos de 50 ms por vez em tablet fraco). */
+  const yieldTask = (): Promise<void> => new Promise((res) => setTimeout(res, 0));
+
   function emitStep(step: Step, silent = false): void {
     drawn.push(step.ball);
     current = step.ball;
@@ -191,7 +194,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     audio.setMode('lively');
     fast = turbo();
     audio.setFast(fast);
+    await yieldTask(); // o início da rodada (render, voz) pinta antes da 1ª bola / do lote do Turbo
     while (!s.mainDone && id === runId) {
+      if (id !== runId) return;
       if (fast) {
         // Turbo: todas as bolas restantes saem de uma vez e as cartelas já aparecem preenchidas.
         await nextPaint();
@@ -259,6 +264,11 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       if (id !== runId) return;
       extraOffer = null;
       if (!buy) break;
+      // o toque em BOLA EXTRA pinta (painel some, bola a caminho) antes do trabalho pesado (voz, sons, bola)
+      phase = 'extraDrawing';
+      changed();
+      await nextPaint();
+      if (id !== runId) return;
       if (data.credits < offer.cost) {
         data.credits += data.tuning.presente; // créditos infinitos
         data.stats.recargas++;
@@ -494,9 +504,12 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         if (id !== runId || phase !== 'drawing' || session) return;
         const { plan } = planRound(planArgs);
         const s = new RoundSession(planArgs.cards, planArgs.active, planArgs.bet, jackpotNow, plan, 0, factor);
-        roundStartedAt = now();
-        bus.emit('roundStart', { bet: planArgs.bet, totalBet: bet });
-        startSession(s);
+        void yieldTask().then(() => {
+          if (id !== runId || phase !== 'drawing' || session) return;
+          roundStartedAt = now();
+          bus.emit('roundStart', { bet: planArgs.bet, totalBet: bet });
+          startSession(s);
+        });
       });
     },
 
