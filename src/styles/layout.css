@@ -67,9 +67,9 @@
   grid-gap: var(--gap); gap: var(--gap); min-height: 0; min-width: 0;
 }
 /* barra de baixo: [aposta][cartelas] | [Numeros][Turbo][JOGAR] (dois blocos flex, sem display:contents) */
-.altina .bar { display: flex; align-items: stretch; min-width: 0; }
-.altina .bar .rowa { display: flex; flex: none; align-items: stretch; }
-.altina .bar .rowb { display: flex; flex: 1 1 0; min-width: 0; align-items: stretch; margin-left: var(--gap); }
+.altina .bar { display: flex; align-items: center; min-width: 0; }
+.altina .bar .rowa { display: flex; flex: none; align-items: center; }
+.altina .bar .rowb { display: flex; flex: 1 1 0; min-width: 0; align-items: center; margin-left: var(--gap); }
 .altina .bar .rowa > * + *, .altina .bar .rowb > * + * { margin-left: var(--gap); }
 .altina .bar .g-play { flex: 1 1 0; min-width: 150px; }
 .altina .bar .g-nums, .altina .bar .g-turbo { flex: none; }
@@ -106,6 +106,7 @@
     --gap: 8px; --pad: 8px;
     --cellfs: 20px;
     grid-template-columns: 64px minmax(0, 1fr) 64px 64px;
+    grid-column-gap: 12px; column-gap: 12px;
     grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
     grid-template-areas:
       "logo cred jack jack"

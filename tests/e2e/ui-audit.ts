@@ -145,6 +145,39 @@ async function audit(page: Page, label: string): Promise<string[]> {
   }, label);
 }
 
+/** Girar o aparelho no meio da rodada / oferta de extra / comemoração: estado igual, nada fora da tela. */
+async function rotation(browser: import('@playwright/test').Browser): Promise<number> {
+  let bad = 0;
+  const seq = [{ w: 1280, h: 800 }, { w: 800, h: 1280 }, { w: 844, h: 390 }, { w: 360, h: 740 }, { w: 740, h: 360 }, { w: 1280, h: 800 }];
+  for (const name of ['drawing', 'extra', 'extra-free', 'bingo', 'mail-open', 'gift', 'settings', 'admin-jogo']) {
+    const ctx = await browser.newContext({ viewport: { width: seq[0].w, height: seq[0].h } });
+    const page = await ctx.newPage();
+    await page.addInitScript('window.__name = (f) => f;');
+    page.on('pageerror', (e) => { bad++; console.log(`PAGEERROR ${e.message}`); });
+    await page.goto(`${BASE}/src/ui/dev.html?s=${name}`, { waitUntil: 'load' });
+    await page.waitForTimeout(450);
+    const state = () => page.evaluate(() => ({
+      counter: document.querySelector('.counter')?.textContent ?? '',
+      cred: document.querySelector('.cred .val')?.textContent ?? '',
+      layers: [...document.querySelectorAll('.layer:not(.hide)')].length,
+      xon: document.querySelector('.altina.x-on') ? 1 : 0,
+      marked: document.querySelectorAll('.cell.mk').length,
+    }));
+    const ref = JSON.stringify(await state());
+    for (const v of seq.slice(1)) {
+      await page.setViewportSize({ width: v.w, height: v.h });
+      await page.waitForTimeout(350);
+      const res = await audit(page, `giro ${name} ${v.w}x${v.h}`);
+      const st = JSON.stringify(await state());
+      if (st !== ref) res.push(`[giro ${name} ${v.w}x${v.h}] ESTADO MUDOU ${ref} -> ${st}`);
+      bad += res.length;
+      for (const r of res) console.log(r);
+    }
+    await ctx.close();
+  }
+  return bad;
+}
+
 async function main(): Promise<void> {
   const srv = await startServer();
   mkdirSync('docs/qa', { recursive: true });
@@ -171,6 +204,7 @@ async function main(): Promise<void> {
       }
       await ctx.close();
     }
+    if (!only && !flags.includes('--no-rotation')) problems += await rotation(browser);
   } finally {
     await browser.close();
     srv?.kill();
