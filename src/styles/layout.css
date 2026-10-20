@@ -39,7 +39,7 @@
     "cards ball cap"
     "cards hist hist"
     "cards bar  bar";
-  --ball: clamp(100px, calc(100vh - 650px), 190px);
+  --ball: clamp(100px, calc(100vh - 650px - (var(--ts) - 1) * 110px), 190px);
   --cellfs: max(20px, min(2.7vw, 5.4vh));
 }
 .altina .top {

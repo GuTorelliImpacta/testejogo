@@ -318,7 +318,7 @@
   .altina .bar .btn.sec { padding: 4px 2px; letter-spacing: -.02em; }
   .altina .top { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px; gap: 6px 8px; min-height: 0; }
   .altina .top .logo, .altina .top .sp { display: none; }
-  .altina .top .stat { grid-column: 1; flex-direction: row; align-items: baseline; justify-content: space-between; min-height: 0; padding: 2px 12px; max-width: none; }
+  .altina .top .stat { grid-column: 1; flex-direction: row; align-items: baseline; justify-content: space-between; min-height: 0; padding: 2px 8px; max-width: none; gap: 6px; }
   .altina .top .stat .val { font-size: calc(26px * var(--tsb)); }
   .altina .top .stat .lab { font-size: calc(20px * var(--tsb)); white-space: nowrap; }
   .altina .top .stat { overflow: hidden; }
