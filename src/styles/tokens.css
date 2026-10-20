@@ -1,0 +1,48 @@
+/* Altina da Sorte - tokens de design */
+.altina {
+  --g950: #04221a;
+  --g900: #07301f;
+  --g800: #0b4029;
+  --g700: #115a37;
+  --g600: #187a49;
+  --gold: #ffd24a;
+  --gold-d: #c9971c;
+  --gold-l: #fff0b0;
+  --cream: #fff8e1;
+  --cream-2: #f1e3b8;
+  --ink: #1a1405;
+  --txt: #fffbea;
+  --txt-dim: #a8cdb8;
+  --play: #3fd16a;
+  --play-ink: #04210f;
+  --danger: #ffd9d0;
+  --yellow: #ffe600;
+
+  /* cartelas */
+  --c1: #c62828;
+  --c2: #1565c0;
+  --c3: #2e7d32;
+  --c4: #6a1b9a;
+
+  /* bolas por faixa: [claro, escuro, texto do miolo] */
+  --b1a: #ff6b5e; --b1b: #b71c1c;
+  --b2a: #ffe066; --b2b: #d89a00;
+  --b3a: #6fe08a; --b3b: #1b7a36;
+  --b4a: #6aa9ff; --b4b: #0d47a1;
+  --b5a: #c58bff; --b5b: #5a189a;
+
+  /* escala de texto (Ajustes) */
+  --ts: 1;
+  --tsb: 1; /* escala contida para barras e cartelas */
+  --fs: calc(20px * var(--ts));
+  --fs-l: calc(24px * var(--ts));
+  --fs-xl: calc(32px * var(--ts));
+
+  --tap: 64px;
+  --gap: 12px;
+  --pad: 8px;
+  --r: 16px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+.altina.ts-grande { --ts: 1.12; --tsb: 1.06; }
+.altina.ts-muito { --ts: 1.25; --tsb: 1.1; }

@@ -31,3 +31,20 @@ export function shuffle<T>(arr: T[], rng: Rng): T[] {
 export function pick<T>(arr: readonly T[], rng: Rng): T {
   return arr[Math.floor(rng() * arr.length)];
 }
+
+/** Inteiro em [0, n). */
+export function randInt(n: number, rng: Rng): number {
+  return Math.floor(rng() * n);
+}
+
+/** Índice sorteado proporcionalmente aos pesos (>= 0). */
+export function weightedIndex(weights: readonly number[], rng: Rng): number {
+  let total = 0;
+  for (const w of weights) total += w;
+  let r = rng() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r < 0) return i;
+  }
+  return weights.length - 1;
+}

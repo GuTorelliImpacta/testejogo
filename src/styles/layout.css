@@ -1,0 +1,122 @@
+/* Altina da Sorte - layout responsivo (grid + clamp) */
+.altina, .altina * { box-sizing: border-box; }
+.altina {
+  position: fixed;
+  inset: 0;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: grid;
+  gap: var(--gap);
+  padding: var(--pad);
+  font-family: var(--font);
+  font-size: var(--fs);
+  line-height: 1.15;
+  color: var(--txt);
+  background:
+    radial-gradient(ellipse at 20% 0%, var(--g700) 0%, transparent 60%),
+    linear-gradient(180deg, var(--g800), var(--g950));
+  background-color: var(--g900);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.altina .top    { grid-area: top; }
+.altina .cap    { grid-area: cap; }
+.altina .cards  { grid-area: cards; }
+.altina .ballbox{ grid-area: ball; }
+.altina .hist   { grid-area: hist; }
+.altina .recent { grid-area: recent; display: none; }
+.altina .bar    { grid-area: bar; }
+
+/* ---------- paisagem (tablet principal) ---------- */
+.altina {
+  grid-template-columns: minmax(0, 1fr) clamp(130px, 14vw, 190px) clamp(190px, 17vw, 240px);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "top   top  top"
+    "cards ball cap"
+    "cards hist hist"
+    "cards bar  bar";
+  --ball: clamp(100px, calc(100vh - 650px), 190px);
+  --cellfs: max(20px, min(2.7vw, 5.4vh));
+}
+.altina .top {
+  display: flex; align-items: center; gap: var(--gap); min-height: 72px;
+}
+.altina .cards {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  gap: var(--gap); min-height: 0; min-width: 0;
+}
+.altina .ballbox { display: grid; place-items: center; min-height: 0; min-width: 0; }
+.altina .cap { display: flex; align-items: center; min-height: 0; min-width: 0; }
+.altina .hist { min-width: 0; }
+.altina .bar {
+  display: grid; gap: var(--gap);
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas:
+    "bet  bet"
+    "play play"
+    "s1   s2"
+    "s3   s4";
+}
+.altina .bar .bet-g { grid-area: bet; }
+.altina .bar .play  { grid-area: play; }
+.altina .bar .s1 { grid-area: s1; } .altina .bar .s2 { grid-area: s2; }
+.altina .bar .s3 { grid-area: s3; } .altina .bar .s4 { grid-area: s4; }
+
+/* ---------- retrato (tablet e celular) ---------- */
+@media (orientation: portrait) {
+  .altina {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top   top"
+      "cap   cap"
+      "ball  hist"
+      "cards cards"
+      "bar   bar";
+    --ball: clamp(110px, 14vh, 170px);
+    --cellfs: max(20px, min(4.2vw, 3.3vh));
+  }
+  .altina .cap { min-height: 56px; }
+  .altina .bar {
+    grid-template-columns: 1fr 1.3fr 1fr 1fr;
+    grid-template-areas:
+      "bet bet play play"
+      "s1  s2  s3   s4";
+    align-items: stretch;
+  }
+}
+
+/* ---------- celular ---------- */
+@media (orientation: portrait) and (max-width: 599px) {
+  .altina {
+    --gap: 8px; --pad: 8px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "top"
+      "cap"
+      "recent"
+      "cards"
+      "bar";
+    --cellfs: 20px;
+  }
+  .altina .recent { display: flex; }
+  .altina .cap { min-height: 44px; }
+  .altina .bar {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-areas:
+      "bet bet bet bet"
+      "play play play play"
+      "s1 s2 s3 s4";
+  }
+}
+/* paisagem em celular (baixo) */
+@media (orientation: landscape) and (max-height: 520px) {
+  .altina { --gap: 6px; --pad: 6px; --cellfs: max(20px, min(2.4vw, 6.5vh)); --ball: 90px;
+    grid-template-columns: minmax(0, 1fr) 100px minmax(160px, 240px); }
+  .altina .bar { grid-template-areas: "bet bet" "play play" "s1 s2" "s3 s4"; }
+}

@@ -1,0 +1,337 @@
+/* Altina da Sorte - componentes. Animacoes: SOMENTE transform e opacity. */
+.altina button { font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+.altina :focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
+.altina .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.altina .hide { display: none !important; }
+
+/* ---------- botoes ---------- */
+.altina .btn {
+  min-height: var(--tap); min-width: var(--tap);
+  padding: 6px 12px;
+  border: 3px solid var(--gold-d);
+  border-radius: var(--r);
+  background: var(--cream);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: var(--fs);
+  line-height: 1.1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  text-align: center;
+  box-shadow: 0 4px 0 var(--gold-d);
+  transition: transform .08s ease;
+}
+.altina .btn:active:not(:disabled) { transform: translateY(3px) scale(.98); }
+.altina .btn:disabled { opacity: .5; cursor: default; box-shadow: none; }
+.altina .btn[aria-pressed="true"], .altina .btn.sel { background: var(--gold); border-color: #fff; }
+.altina .btn svg { width: 28px; height: 28px; flex: none; }
+.altina .btn.play {
+  min-height: 96px; font-size: calc(40px * var(--ts)); letter-spacing: .04em;
+  background: var(--play); color: var(--play-ink); border-color: var(--gold);
+  box-shadow: 0 6px 0 #1a8a3e, 0 0 18px rgba(63, 209, 106, .55);
+}
+.altina .btn.play:disabled { box-shadow: none; }
+.altina .btn.big { min-height: 120px; font-size: calc(30px * var(--ts)); width: 100%; }
+.altina .btn.gold { background: var(--gold); color: var(--ink); border-color: #fff; }
+.altina .btn.green { background: var(--play); color: var(--play-ink); border-color: var(--gold); }
+.altina .btn.icon { padding: 0; width: 72px; height: 72px; }
+.altina .btn.sq { width: var(--tap); flex: none; padding: 0; font-size: calc(36px * var(--ts)); }
+
+/* ---------- topo ---------- */
+.altina .logo {
+  display: flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 6px;
+  background: none; border: 0; text-align: left; flex: 0 1 auto;
+  font-weight: 900; font-size: calc(30px * var(--ts)); line-height: 1; color: var(--gold);
+  text-shadow: 0 2px 0 #000a;
+  letter-spacing: -.01em;
+}
+.altina .logo svg { width: 1.2em; height: 1.2em; flex: none; }
+.altina .logo .lt { display: flex; flex-direction: column; }
+.altina .logo .lt span:first-child { color: var(--gold-l); }
+.altina .stat {
+  display: flex; flex-direction: column; justify-content: center; min-width: 0;
+  padding: 4px 14px; border-radius: var(--r); background: #0007; border: 2px solid #ffffff33;
+  min-height: 64px;
+}
+.altina .stat .lab { font-size: var(--fs); color: var(--txt-dim); font-weight: 700; line-height: 1.1; }
+.altina .stat .val { font-size: calc(34px * var(--ts)); font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--txt); }
+.altina .stat.jack .val { color: var(--gold); }
+.altina .stat.cred { flex: 1 1 auto; max-width: 340px; }
+.altina .stat.jack { flex: 1 1 auto; max-width: 340px; }
+.altina .top .sp { flex: 1; }
+.altina .top .stat.cred .val.up { color: #7dff9a; }
+
+/* ---------- legenda ---------- */
+.altina .cap { position: relative; }
+.altina .caption {
+  font-size: calc(26px * var(--ts)); font-weight: 900; line-height: 1.1; color: var(--gold-l);
+  text-shadow: 0 2px 0 #000b; opacity: 0; transform: translateY(8px);
+  transition: opacity .2s ease, transform .2s ease; padding: 0 4px; width: 100%;
+  overflow-wrap: anywhere;
+}
+.altina .caption.on { opacity: 1; transform: none; }
+.altina .caption.hot { color: var(--yellow); }
+
+/* ---------- bola ---------- */
+.altina .ballbox .ball { width: var(--ball); height: var(--ball); font-size: calc(var(--ball) * .46); }
+.altina .ball {
+  position: relative; border-radius: 50%; display: grid; place-items: center;
+  --ba: #ddd; --bb: #666;
+  background: radial-gradient(circle at 32% 28%, var(--ba) 0%, var(--bb) 78%);
+  color: var(--ink); flex: none;
+  box-shadow: 0 6px 14px #0008, inset 0 -6px 10px #0004;
+}
+.altina .ball::before { /* miolo branco */
+  content: ""; position: absolute; inset: 17%; border-radius: 50%; background: #fffdf3; box-shadow: inset 0 2px 5px #0003;
+}
+.altina .ball b { position: relative; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.03em; color: #111; }
+.altina .ball.empty { opacity: .35; }
+.altina .ball.r1 { --ba: var(--b1a); --bb: var(--b1b); }
+.altina .ball.r2 { --ba: var(--b2a); --bb: var(--b2b); }
+.altina .ball.r3 { --ba: var(--b3a); --bb: var(--b3b); }
+.altina .ball.r4 { --ba: var(--b4a); --bb: var(--b4b); }
+.altina .ball.r5 { --ba: var(--b5a); --bb: var(--b5b); }
+.altina .ball.xtra::after {
+  content: "+"; position: absolute; right: -2%; top: -2%; width: 30%; height: 30%; border-radius: 50%;
+  background: var(--gold); color: var(--ink); font-weight: 900; font-size: calc(var(--ball) * .22);
+  display: grid; place-items: center; line-height: 1;
+}
+.altina .ballbox .ball.shine::after { /* brilho (removido no modo leve) */
+  content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 28% 22%, #fff9 0, transparent 35%);
+}
+
+/* ---------- historico 1-60 ---------- */
+.altina .hist {
+  display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; align-content: start;
+  padding: 4px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22;
+}
+.altina .hist i {
+  font-style: normal; font-weight: 800; font-size: 20px; line-height: 1; letter-spacing: -.04em;
+  text-align: center; padding: 4px 0; border-radius: 6px; color: #8fb8a0; background: #ffffff0d;
+  font-variant-numeric: tabular-nums;
+}
+.altina .hist i.on { color: #fff; }
+.altina .hist i.on.r1 { background: var(--b1b); } .altina .hist i.on.r3 { background: var(--b3b); }
+.altina .hist i.on.r4 { background: var(--b4b); } .altina .hist i.on.r5 { background: var(--b5b); }
+.altina .hist i.on.r2 { background: var(--b2a); color: #1a1405; }
+.altina .hist i.on.x { outline: 2px dashed var(--gold); outline-offset: -2px; }
+.altina .hist i.last { background: var(--gold) !important; color: var(--ink) !important; transform: scale(1.12); }
+.altina .recent { align-items: center; gap: 6px; justify-content: space-between; }
+.altina .recent .ball { width: 44px; height: 44px; font-size: 20px; opacity: .92; }
+.altina .recent .ball:first-child { width: 76px; height: 76px; font-size: 34px; opacity: 1; }
+.altina .recent .ball::before { inset: 12%; }
+.altina .recent .sep { flex: 1; }
+
+/* ---------- barra de controles ---------- */
+.altina .bet-g { display: flex; gap: var(--gap); align-items: stretch; }
+.altina .bet-g .betbox {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
+  border-radius: var(--r); background: #0007; border: 2px solid #ffffff33; min-width: 0; padding: 0 6px;
+}
+.altina .betbox .l1 { font-size: calc(20px * var(--tsb)); font-weight: 700; color: var(--txt-dim); white-space: nowrap; }
+.altina .betbox .l2 { font-size: calc(26px * var(--tsb)); font-weight: 900; color: var(--txt); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.altina .bar .btn.sec { font-size: calc(20px * var(--tsb)); flex-direction: column; gap: 2px; padding: 4px 6px; min-height: var(--tap); }
+.altina .bar .btn.sec svg { width: 26px; height: 26px; }
+@media (orientation: landscape) {
+  .altina .bar .btn.sec { flex-direction: row; }
+}
+
+/* ---------- cartelas ---------- */
+.altina .card {
+  --cc: var(--c1);
+  position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  background: var(--cream); color: var(--ink); border: 6px solid var(--cc); border-radius: 18px;
+  padding: 4px 6px 6px; box-shadow: 0 0 0 2px #ffffff40, 0 6px 12px #0006;
+  transition: opacity .15s ease; text-align: left; font: inherit;
+}
+.altina .card.k2 { --cc: var(--c2); } .altina .card.k3 { --cc: var(--c3); } .altina .card.k4 { --cc: var(--c4); }
+.altina .card.off { opacity: .42; }
+.altina .card.lock { cursor: default; }
+.altina .card-head { display: flex; align-items: center; gap: 6px; min-height: 36px; flex: none; }
+.altina .card-num {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--cc); color: #fff; font-weight: 900;
+  font-size: 22px; display: grid; place-items: center; flex: none; line-height: 1;
+}
+.altina .seal {
+  display: none; align-items: center; gap: 4px; min-width: 0; padding: 1px 8px 1px 4px; border-radius: 99px;
+  background: var(--gold); color: var(--ink); font-weight: 900; font-size: calc(20px * var(--tsb)); line-height: 1.2;
+  border: 2px solid var(--gold-d); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.altina .seal > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.altina .seal svg { width: 22px; height: 22px; flex: none; }
+.altina .seal.on { display: inline-flex; }
+.altina .falta {
+  display: none; margin-left: auto; padding: 1px 10px; border-radius: 8px; background: var(--yellow); color: #000;
+  font-weight: 900; font-size: calc(20px * var(--tsb)); line-height: 1.25; white-space: nowrap; border: 2px solid #000;
+}
+.altina .falta.on { display: inline-block; animation: pulse 0.9s ease-in-out infinite alternate; }
+.altina .offtag { display: none; margin-left: auto; font-weight: 800; font-size: calc(20px * var(--tsb)); color: #333; white-space: nowrap; }
+.altina .card.off .offtag { display: inline; }
+.altina .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; }
+.altina .cell {
+  position: relative; isolation: isolate; display: grid; place-items: center; min-width: 0; min-height: 0;
+  font-weight: 900; font-size: var(--cellfs); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  background: #fff; border: 2px solid #d8c88d; border-radius: 8px; color: var(--ink);
+}
+.altina .cell::before { /* carimbo */
+  content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; aspect-ratio: 1; border-radius: 50%; background: var(--cc);
+  opacity: 0; transform: scale(.4);
+}
+.altina .cell.mk { color: #fff; border-color: transparent; background: #fff4; }
+.altina .cell.mk::before { opacity: 1; transform: none; }
+.altina .cell.mk.nw::before { animation: stamp .15s ease-out; }
+.altina .cell.miss { background: #ffb300; border-color: #000; border-style: dashed; color: #000; }
+.altina .cell.miss::after { /* pulso */
+  content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 8px; background: var(--yellow);
+  animation: pulse .8s ease-in-out infinite alternate;
+}
+.altina .card.flash { animation: flash .5s ease-out; }
+@keyframes stamp { from { transform: scale(.4); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes pulse { from { opacity: .35; } to { opacity: 1; } }
+@keyframes flash { 0% { transform: scale(1); } 40% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+/* ---------- modais ---------- */
+.altina .layer {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 12px;
+  background: rgba(2, 20, 12, .78);
+}
+.altina .layer.soft { background: rgba(2, 20, 12, .35); pointer-events: none; }
+.altina .layer.soft .dlg { pointer-events: auto; }
+.altina .dlg {
+  width: min(760px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px;
+  background: linear-gradient(180deg, var(--g700), var(--g900)); border: 4px solid var(--gold); border-radius: 22px;
+  padding: 16px; box-shadow: 0 10px 30px #000a;
+}
+.altina .dlg h2 { margin: 0; font-size: calc(32px * var(--ts)); color: var(--gold); text-align: center; line-height: 1.1; }
+.altina .dlg p { margin: 0; font-size: var(--fs-l); text-align: center; }
+.altina .dlg .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.altina .dlg .row > * { flex: 1 1 140px; }
+.altina .dlg .stack { display: flex; flex-direction: column; gap: 14px; }
+.altina .dlg.extra { border-color: var(--yellow); }
+.altina .xrow { display: flex; gap: 14px; }
+.altina .xrow .btn { flex: 1; }
+.altina .xrem { font-size: var(--fs); text-align: center; color: var(--txt-dim); font-weight: 700; }
+@media (orientation: landscape) and (min-width: 700px) {
+  .altina .layer.sheet { place-items: end end; padding: 8px; }
+  .altina .layer.sheet .dlg { width: calc(clamp(130px, 14vw, 190px) + clamp(190px, 17vw, 240px) + 2 * var(--pad) + var(--gap)); }
+  .altina .layer.sheet .xrow { flex-direction: column; }
+}
+@media (orientation: portrait) and (max-width: 599px) { .altina .xrow { flex-direction: column; } .altina .btn.big { min-height: 88px; } }
+@media (orientation: portrait) { .altina .layer.sheet { place-items: end center; padding: 8px; } }
+
+/* prêmios */
+.altina .ptable { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 900px) { .altina .ptable { grid-template-columns: 1fr 1fr; } }
+.altina .prow { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px; background: #0006; border: 2px solid #ffffff22; min-height: 72px; }
+.altina .prow .pn { flex: 1; min-width: 0; font-weight: 900; font-size: var(--fs-l); line-height: 1.1; }
+.altina .prow .pn small { display: block; font-size: var(--fs); color: var(--txt-dim); font-weight: 700; }
+.altina .prow .pv { font-weight: 900; font-size: calc(26px * var(--ts)); color: var(--gold); text-align: right; white-space: nowrap; }
+.altina .mini { display: grid; grid-template-columns: repeat(5, 18px); grid-template-rows: repeat(3, 18px); gap: 2px; flex: none; }
+.altina .mini i { background: #ffffff2a; border-radius: 3px; }
+.altina .mini i.x { background: var(--gold); }
+.altina .prow.jk { border-color: var(--gold); }
+
+/* ajustes */
+.altina .sgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 900px) and (orientation: landscape) { .altina .sgrid { grid-template-columns: 1fr 1fr; } }
+.altina .sset { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: #0006; }
+.altina .sset h3 { margin: 0; font-size: var(--fs-l); color: var(--gold-l); line-height: 1.1; }
+.altina .seg { display: flex; gap: 8px; }
+.altina .seg .btn { flex: 1; padding: 4px 6px; }
+.altina .vol { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.altina .vol .lab { flex: 0 0 100%; font-weight: 800; }
+.altina .meter { flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 28px; }
+.altina .meter i { background: #ffffff22; border-radius: 3px; }
+.altina .meter i.on { background: var(--gold); }
+
+/* oferta / presente / celebração */
+.altina .gift-ic { display: grid; place-items: center; }
+.altina .gift-ic svg { width: 96px; height: 96px; }
+.altina .bigprize { font-size: calc(56px * var(--ts)); font-weight: 900; color: var(--gold); text-align: center; line-height: 1; font-variant-numeric: tabular-nums; }
+.altina .celeb { position: relative; text-align: center; }
+.altina .celeb .big {
+  font-size: calc(72px * var(--ts)); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
+  animation: bump .7s ease-out both; letter-spacing: .02em;
+}
+.altina .celeb .big.sm { font-size: calc(44px * var(--ts)); }
+.altina .celeb .sub { font-size: var(--fs-xl); font-weight: 800; }
+.altina .confetti { position: fixed; inset: 0; z-index: 49; pointer-events: none; overflow: hidden; }
+.altina .confetti i {
+  position: absolute; left: 0; top: 0; width: 14px; height: 22px; border-radius: 3px; opacity: 0;
+  background: var(--k, #ffd24a);
+  animation: fall var(--dur, 3.5s) linear var(--dl, 0s) infinite;
+}
+.altina .confetti i.cl { width: 36px; height: 36px; background: none; }
+.altina .confetti i.cl svg { width: 100%; height: 100%; }
+@keyframes fall {
+  0% { transform: translate3d(calc(var(--x) * 1vw), -12vh, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(calc(var(--x) * 1vw + var(--dx) * 1vw), 108vh, 0) rotate(var(--rot, 540deg)); opacity: 1; }
+}
+@keyframes bump { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+
+/* ---------- splash ---------- */
+.altina .splash {
+  position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  padding: 16px; text-align: center;
+  background: radial-gradient(ellipse at 50% 30%, var(--g600) 0%, transparent 65%), linear-gradient(180deg, var(--g800), var(--g950));
+}
+.altina .splash .logo { font-size: clamp(40px, 9vmin, 84px); justify-content: center; padding: 8px 16px; flex-direction: column; text-align: center; }
+.altina .splash .logo svg { width: 1.6em; height: 1.6em; }
+.altina .splash .logo .lt { align-items: center; }
+.altina .splash .greet { font-size: calc(28px * var(--ts)); font-weight: 800; max-width: 22em; }
+.altina .splash .btn { min-height: 112px; font-size: calc(40px * var(--ts)); padding: 0 48px; }
+
+/* ---------- pin / admin ---------- */
+.altina .dots { display: flex; justify-content: center; gap: 14px; min-height: 36px; }
+.altina .dots i { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--gold); background: transparent; }
+.altina .dots i.on { background: var(--gold); }
+.altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: min(360px, 100%); margin: 0 auto; }
+.altina .keys .btn { min-height: 72px; font-size: calc(32px * var(--ts)); }
+.altina .adm pre, .altina .adm textarea {
+  width: 100%; margin: 0; max-height: 28vh; min-height: 90px; overflow: auto; padding: 8px; border-radius: 10px; background: #000a; color: #d8ffe4;
+  font: 20px/1.3 ui-monospace, Menlo, Consolas, monospace; user-select: text; -webkit-user-select: text; border: 2px solid #ffffff33; resize: vertical;
+}
+.altina .adm .msg { font-size: var(--fs); color: var(--gold-l); text-align: center; min-height: 1.2em; }
+
+/* ---------- modo leve: sem brilhos nem particulas ---------- */
+.altina.light *, .altina.light *::before, .altina.light *::after { animation: none !important; transition: none !important; box-shadow: none !important; text-shadow: none !important; }
+.altina.light .confetti, .altina.light .ball.shine::after { display: none !important; }
+.altina.light .cell.miss::after { display: none; }
+.altina.light .ball { background: var(--bb); }
+.altina.light .btn.play { box-shadow: none; }
+@media (prefers-reduced-motion: reduce) {
+  .altina *, .altina *::before, .altina *::after { animation: none !important; transition: none !important; }
+  .altina .confetti { display: none; }
+}
+
+/* ---------- ocultacoes por tamanho (depois dos displays base) ---------- */
+@media (orientation: portrait) and (max-width: 599px) { .altina .ballbox, .altina .hist { display: none; } }
+@media (orientation: landscape) and (max-height: 520px) { .altina .hist { display: none; } }
+
+.altina .bar .btn .sh { display: none; }
+@media (orientation: portrait) and (max-width: 599px) {
+  .altina.ts-grande { --ts: 1.06; --tsb: 1.03; }
+  .altina.ts-muito { --ts: 1.12; --tsb: 1.05; }
+  .altina .bar .btn .sh { display: inline; }
+  .altina .bar .btn .lg { display: none; }
+  .altina .bar .btn.sec svg { display: none; }
+  .altina .bar .btn.sec { padding: 4px 2px; letter-spacing: -.02em; }
+  .altina .top { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px; gap: 6px 8px; min-height: 0; }
+  .altina .top .logo, .altina .top .sp { display: none; }
+  .altina .top .stat { grid-column: 1; flex-direction: row; align-items: baseline; justify-content: space-between; min-height: 0; padding: 2px 12px; max-width: none; }
+  .altina .top .stat .val { font-size: calc(26px * var(--tsb)); }
+  .altina .top .stat .lab { font-size: calc(20px * var(--tsb)); white-space: nowrap; }
+  .altina .top .stat { overflow: hidden; }
+  .altina .top > .btn { grid-row: 1 / span 2; align-self: center; width: 64px; height: 64px; }
+  .altina .top > .btn:nth-last-child(2) { grid-column: 2; }
+  .altina .top > .btn:last-child { grid-column: 3; }
+  .altina .card-head { min-height: 34px; }
+  .altina .seal { padding-left: 3px; padding-right: 6px; }
+  .altina .seal svg { display: none; }
+  .altina .card.has-falta .seal { display: none; }
+  .altina .cell { border-width: 1px; border-radius: 5px; }
+  .altina .cell::before { height: 100%; width: 100%; aspect-ratio: auto; border-radius: 5px; }
+}
+.altina .dlg:focus, .altina .dlg:focus-visible { outline: none; }
+
+@media (orientation: portrait) and (max-width: 599px) { .altina .bar, .altina .bet-g { gap: 12px; } .altina .bar { row-gap: 10px; } }
