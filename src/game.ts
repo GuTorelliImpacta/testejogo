@@ -163,7 +163,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       audio.setFast(false);
       auto = false; // jogo automático para em qualquer oferta
       phase = 'extraOffer';
-      extraOffer = { cost: offer.cost, free: offer.free, remaining: offer.remaining, improves: offer.improves };
+      // `gain` mostrado na tela = prêmio total do padrão que sai se a bola vier
+      const improves = offer.improves.map((i) => ({ ...i, gain: prizeFor(i.pattern, s.bet) }));
+      extraOffer = { cost: offer.cost, free: offer.free, remaining: offer.remaining, improves };
       bus.emit('extraOffer', extraOffer);
       if (offer.free) bus.emit('freeExtra');
       persist();

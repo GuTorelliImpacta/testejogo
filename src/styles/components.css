@@ -38,8 +38,9 @@
 
 /* ---------- topo ---------- */
 .altina .logo {
-  display: flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 6px;
-  background: none; border: 0; text-align: left; flex: 0 1 auto; min-width: 0;
+  min-width: var(--tap);
+  display: flex; align-items: center; gap: 6px; min-height: var(--tap); min-width: var(--tap); padding: 0 6px;
+  background: none; border: 0; text-align: left; flex: 0 1 auto; min-width: var(--tap);
   font-weight: 900; font-size: calc(28px * var(--ts)); line-height: 1; color: var(--gold);
   text-shadow: 0 2px 0 #000a;
   letter-spacing: -.01em;
@@ -50,7 +51,7 @@
 .altina .stat {
   display: flex; flex-direction: column; justify-content: center; min-width: 0;
   padding: 4px 12px; border-radius: var(--r); background: #0007; border: 2px solid #ffffff33;
-  min-height: 64px; flex: 1 1 0; max-width: 340px; overflow: hidden;
+  min-height: 64px; flex: 1 1 190px; max-width: 340px; overflow: hidden;
 }
 .altina .stat .lab { font-size: var(--fs); color: var(--txt-dim); font-weight: 700; line-height: 1.1; white-space: nowrap; }
 .altina .stat .val { font-size: calc(32px * var(--ts)); font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--txt); white-space: nowrap; }
@@ -156,13 +157,15 @@
   border-radius: 18px; border: 4px solid var(--yellow); background: rgba(0, 0, 0, .62);
 }
 .altina .xpanel.free { border-color: var(--gold); background: rgba(70, 48, 0, .7); }
-.altina .xtitle { font-size: calc(30px * var(--ts)); font-weight: 900; color: var(--yellow); text-align: center; line-height: 1.05; }
+.altina .xtitle { font-size: calc(30px * var(--ts)); font-weight: 900; color: var(--yellow); text-align: center; line-height: 1.15; }
 .altina .xpanel.free .xtitle { color: var(--gold); }
 .altina .xrow { display: flex; gap: var(--gap); }
 .altina .xpanel .btn.big { flex: 1 1 0; min-width: 0; min-height: 88px; font-size: calc(28px * var(--ts)); width: auto; }
 .altina .xrem { display: none; font-size: var(--fs); text-align: center; color: var(--txt-dim); font-weight: 700; }
-@media (orientation: portrait) { .altina .xrem { display: block; } }
-@media (orientation: portrait) and (max-width: 599px) { .altina .xrem { display: none; } .altina .xpanel .btn.big { min-height: 80px; } }
+@media (orientation: portrait) and (min-height: 1100px) { .altina .xrem { display: block; } }
+@media (orientation: portrait) and (max-width: 599px) { .altina .xrem { display: none; } .altina .xpanel .btn.big { min-height: 72px; font-size: calc(24px * var(--ts)); padding: 4px 6px; } .altina .xpanel { padding: 8px; gap: 8px; border-width: 3px; } .altina .xtitle { font-size: calc(24px * var(--ts)); } }
+
+.altina.x-on .ballsec { display: none; }
 
 /* ---------- barra inferior ---------- */
 .altina .bar { align-items: center; }
@@ -229,10 +232,13 @@
 .altina .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; }
 .altina .cell {
   position: relative; isolation: isolate; display: grid; place-items: center; min-width: 0; min-height: 0;
-  font-weight: 900; font-size: var(--cellfs); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
+  font-size: clamp(20px, calc(((100cqh - var(--gap)) / 2 - 62px) / 3 * .66), var(--cellfs));
   background: #fff; border: 2px solid #d8c88d; border-radius: 8px; color: var(--ink);
 }
-.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; aspect-ratio: 1; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
+.altina .cards { container-type: size; }
+.altina .cell { container-type: size; }
+.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94cqmin; height: 94cqmin; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
 .altina .cell.mk { color: #fff; border-color: transparent; background: #fff4; }
 .altina .cell.mk::before { opacity: 1; transform: none; }
 .altina .cell.mk.nw::before { animation: stamp .15s ease-out; }
@@ -254,7 +260,7 @@
   padding: 16px; box-shadow: 0 10px 30px #000a;
 }
 .altina .dlg-head { flex: none; display: flex; flex-direction: column; gap: 10px; }
-.altina .dlg-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.altina .dlg-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 8px; display: flex; flex-direction: column; gap: 12px; }
 .altina .dlg-foot { flex: none; display: flex; gap: 12px; }
 .altina .dlg-foot .btn { flex: 1; width: auto; }
 .altina .dlg-head:empty, .altina .dlg-foot:empty { display: none; }
@@ -301,7 +307,7 @@
 .altina .gift-ic { display: grid; place-items: center; }
 .altina .gift-ic svg { width: 96px; height: 96px; }
 .altina .dlg-body .gift-ic, .altina .dlg-body h2, .altina .dlg-body .bigprize { flex: none; }
-.altina .bigprize { font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1; font-variant-numeric: tabular-nums; }
+.altina .bigprize { font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1.12; font-variant-numeric: tabular-nums; }
 .altina .celeb { position: relative; text-align: center; }
 .altina .celeb .big {
   font-size: min(calc(72px * var(--ts)), 15vw); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
@@ -340,6 +346,7 @@
 .altina .dots i { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--gold); background: transparent; }
 .altina .dots i.on { background: var(--gold); }
 .altina .pinmsg { min-height: 1.2em; }
+.altina .dlg-foot { margin-top: 2px; }
 .altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: min(360px, 100%); margin: 0 auto; }
 .altina .keys .btn { min-height: 68px; font-size: calc(32px * var(--ts)); }
 .altina .adm pre, .altina .adm textarea {
@@ -357,9 +364,15 @@
   .altina .ptab .ph { flex: none; padding: 0; }
   .altina .prows { display: flex; flex: 1; gap: 8px; align-content: normal; }
   .altina .pr { flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 2px 4px; font-size: calc(22px * var(--ts)); }
-  .altina.has-mail .logo .lt { display: none; }
+  .altina .logo .lt, .altina .top .sp { display: none; }
+  .altina .card.has-falta .card-num { display: none; }
 }
 @media (orientation: portrait) and (max-width: 599px) {
+  .altina .ballsec, .altina .trail { display: none; }
+  .altina .strip { display: grid; gap: 6px; }
+  .altina.x-on .strip, .altina.x-on .ptab { display: none; }
+  .altina .bar { align-items: stretch; }
+  .altina .bar .rowa, .altina .bar .rowb, .altina .xrow { gap: 12px; }
   .altina.ts-grande { --ts: 1.06; --tsb: 1.03; }
   .altina.ts-muito { --ts: 1.12; --tsb: 1.05; }
   .altina .stat { max-width: none; min-height: 0; padding: 2px 8px; }
@@ -367,11 +380,13 @@
   .altina .top .btn.icon { width: 64px; height: 64px; }
   .altina .caption { font-size: calc(21px * var(--ts)); line-height: 1.05; }
   .altina .mailb { width: 100%; height: 64px; display: flex; gap: 10px; justify-content: center; align-items: center; border-radius: 18px; }
+  .altina .mailb { padding-right: 26px; }
   .altina .mailb svg { width: 40px; height: 40px; }
   .altina .mailb .ml { display: inline; font-size: calc(22px * var(--ts)); font-weight: 900; color: var(--gold-l); }
   .altina .mailb .clv { right: 6px; top: -10px; }
   .altina .ptab .ph { display: none; }
   .altina .pr { font-size: calc(20px * var(--ts)); letter-spacing: -.02em; padding: 2px 0; }
+  .altina .pr.jk { flex: 1.5 1 0; }
   .altina .pr .full { display: none; }
   .altina .pr .short { display: inline; }
   .altina .prows { gap: 4px; }
@@ -379,12 +394,16 @@
   .altina .card { border-width: 4px; padding: 2px 4px 4px; border-radius: 14px; }
   .altina .card-head { min-height: 30px; }
   .altina .card-num { width: 28px; height: 28px; font-size: 20px; }
+  .altina .falta { white-space: nowrap; letter-spacing: -.04em; padding: 0 2px; }
   .altina .falta .full { display: none; }
   .altina .falta .short { display: inline; }
   .altina .cell { border-width: 1px; border-radius: 5px; }
-  .altina .cell::before { height: 100%; width: 100%; aspect-ratio: auto; border-radius: 5px; }
+  .altina .cell::before { height: 100%; width: 100%; border-radius: 5px; }
   .altina .seal .st { font-size: calc(22px * var(--tsb)); padding: 4px 8px; border-width: 3px; }
   .altina .dlg { padding: 12px; gap: 10px; }
+  .altina .ptable { gap: 4px; }
+  .altina .prow { min-height: 46px; padding: 2px 10px; }
+  .altina .mini { grid-template-columns: repeat(5, 12px); grid-template-rows: repeat(3, 12px); }
   .altina .layer { padding: 8px; }
   .altina .trow .tg { flex-basis: 132px; }
   .altina .btn.big { min-height: 88px; }

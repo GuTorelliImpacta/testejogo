@@ -1,6 +1,6 @@
 // Service worker do Altina da Sorte: funciona offline.
 // Estratégia: app shell pré-cacheado; /assets e /audio em cache-first com preenchimento em execução.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL = `altina-shell-${VERSION}`;
 const RUNTIME = `altina-runtime-${VERSION}`;
 
@@ -14,6 +14,18 @@ self.addEventListener('install', (e) => {
         const html = await (await fetch('/', { cache: 'reload' })).text();
         const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
         await c.addAll(urls);
+        // pacote de voz: baixa em segundo plano (melhor esforço; não falha a instalação)
+        try {
+          const m = await (await fetch('/audio/voice/manifest.json')).json();
+          await c.put('/audio/voice/manifest.json', await fetch('/audio/voice/manifest.json'));
+          const rt = await caches.open(RUNTIME);
+          for (const id of m.ids || []) {
+            for (const ext of ['webm', 'mp3']) {
+              const u = `/audio/voice/${id}.${ext}`;
+              try { const r = await fetch(u); if (r.ok) await rt.put(u, r); } catch (e) { /* ignora */ }
+            }
+          }
+        } catch (e) { /* sem voz pré-baixada: o runtime cuida */ }
       })
       .then(() => self.skipWaiting()),
   );

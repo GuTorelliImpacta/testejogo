@@ -1,5 +1,5 @@
 // Harness de desenvolvimento: monta a UI com um GameApi MOCK (nao usado em producao).
-// Abrir: /src/ui/dev.html?s=idle|drawing|extra|extra-free|mail-arrived|mail-open|bingo|bingo-cards|line|line-cards|gift|daily|prizes|settings|pin|admin|splash
+// Abrir: /src/ui/dev.html?s=idle|drawing|extra|extra-free|mail-arrived|mail-open|bingo|bingo-cards|line|line-cards|gift|daily|prizes|settings|settings-jogo|settings-tela|pin|admin|splash
 //        &ts=grande&light=1&big=1 (7 digitos) &set=variado
 import { bus } from '../events';
 import { DEFAULT_SETTINGS, BET_OPTIONS, MULTIPLIER, PATTERN_SETS, jackpotShare } from '../config';
@@ -309,7 +309,11 @@ function scenario(name: string): void {
   if (name === 'idle' || name === 'drawing' || name === 'extra') setSpokenCaption('');
   if (name === 'spoken') setSpokenCaption('Bola vinte e três! Vinte e três!');
   if (name === 'prizes') document.querySelector<HTMLElement>('.ptab')!.click();
-  if (name === 'settings') document.querySelector<HTMLElement>('.top .gear')!.click();
+  if (name.startsWith('settings')) {
+    document.querySelector<HTMLElement>('.top .gear')!.click();
+    const tab = name.split('-')[1];
+    if (tab) [...document.querySelectorAll<HTMLElement>('.tabs .tab')].find((b) => b.textContent!.toLowerCase() === tab)?.click();
+  }
   if (name === 'pin' || name === 'admin') {
     for (let i = 0; i < 5; i++) document.querySelector<HTMLElement>('.top .logo')!.click();
     if (name === 'admin') {

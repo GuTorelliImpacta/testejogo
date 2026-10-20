@@ -15,7 +15,7 @@ for (const vp of [
     await expect(play).toBeVisible();
     await play.click();
     await expect(play).toBeDisabled();
-    await page.locator('button.sec.s3').click({ timeout: 5000 }).catch(() => {});
+    await page.getByRole('button', { name: /Turbo/ }).first().click({ timeout: 5000 }).catch(() => {});
     // trata ofertas e celebrações até voltar ao estado ocioso
     const deadline = Date.now() + 100_000;
     let finished = false;

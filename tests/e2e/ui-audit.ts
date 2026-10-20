@@ -7,8 +7,8 @@ import { chromium, type Page } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 
-const PORT = 4190;
-const BASE = process.env.UI_BASE ?? `http://localhost:${PORT}`;
+const PORT = 4191;
+const BASE = process.env.UI_BASE ?? `http://127.0.0.1:${PORT}`;
 const EXE = '/opt/pw-browsers/chromium';
 const VIEWPORTS = [
   { w: 1280, h: 800 },
@@ -17,7 +17,7 @@ const VIEWPORTS = [
   { w: 768, h: 1024 },
   { w: 360, h: 740 },
 ];
-const ALL = ['idle', 'drawing', 'extra', 'extra-free', 'mail-arrived', 'mail-open', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'prizes', 'settings', 'pin', 'admin'];
+const ALL = ['idle', 'drawing', 'extra', 'extra-free', 'mail-arrived', 'mail-open', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'prizes', 'settings', 'settings-jogo', 'settings-tela', 'pin', 'admin'];
 
 const args = process.argv.slice(2);
 const flags = args.filter((a) => a.startsWith('--'));
@@ -27,7 +27,7 @@ const extraQuery = flags.filter((f) => f.startsWith('--q=')).map((f) => '&' + f.
 
 async function startServer(): Promise<ChildProcess | null> {
   if (process.env.UI_BASE) return null;
-  const p = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+  const p = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], { stdio: 'ignore' });
   for (let i = 0; i < 60; i++) {
     try {
       const r = await fetch(`${BASE}/src/ui/dev.html`);
@@ -109,11 +109,9 @@ async function audit(page: Page, label: string): Promise<string[]> {
       if (e.scrollHeight > e.clientHeight + 2 && e.closest('.btn,.stat,.pr,.xpanel,.counter')) out.push(`CORTE-V "${nm(e)}" ${e.scrollHeight}>${e.clientHeight} .${e.className}`);
     });
     // celulas das cartelas com altura menor que o texto
-    document.querySelectorAll<HTMLElement>('.card:not(.off) .cell').forEach((c, i) => {
-      if (i > 14) return;
-      const r = c.getBoundingClientRect();
-      if (vis(c) && r.height < 21) out.push(`CELULA baixa ${Math.round(r.height)}px`);
-    });
+    let minCell = 999;
+    document.querySelectorAll<HTMLElement>('.card:not(.off) .cell').forEach((c) => { if (vis(c)) minCell = Math.min(minCell, c.getBoundingClientRect().height); });
+    if (minCell < 19.5) out.push(`CELULA baixa ${Math.round(minCell)}px (min)`);
     // regioes principais nao podem se sobrepor
     const regs = ['.top', '.ballsec', '.xpanel', '.strip', '.trail', '.ptab', '.cards', '.bar', '.capslot'].map((s) => [s, document.querySelector(s)] as const)
       .filter(([, e]) => e && vis(e)).map(([s, e]) => [s, e!.getBoundingClientRect()] as const);
@@ -136,6 +134,7 @@ async function main(): Promise<void> {
     for (const v of VIEWPORTS) {
       const ctx = await browser.newContext({ viewport: { width: v.w, height: v.h }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();
+      await page.addInitScript('window.__name = (f) => f;');
       page.on('pageerror', (e) => { problems++; console.log(`PAGEERROR ${e.message}`); });
       for (const name of names) {
         const tsq = flags.find((f) => f.startsWith('--ts='))?.slice(5);

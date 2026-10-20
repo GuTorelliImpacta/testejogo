@@ -177,7 +177,7 @@ export function createCards(): CardsView {
         const imp = on && offer ? offer.improves.find((x) => x.cardIndex === i) : undefined;
         let target: PatternId | null = null;
         if (on && imp) target = imp.pattern;
-        else if (on && showAlmost) target = reachable(u.mask);
+        else if (on && showAlmost && !offer) target = reachable(u.mask);
         let missMask = 0;
         if (target) for (const k of missingCells(u.mask, target)) missMask |= 1 << k;
         if (missMask !== u.miss) {

@@ -71,7 +71,7 @@
   .altina {
     --ball: clamp(100px, 11vh, 140px);
     --cellfs: max(20px, min(3.8vw, 3.2vh));
-    --tcs: 42px;
+    --tcs: 36px;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
     grid-template-areas:
@@ -83,10 +83,10 @@
       "bar";
   }
   .altina .bar {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     grid-template-areas:
-      "bet bet bet cg cg cg"
-      "nums turbo play play play play";
+      "bet bet bet bet bet bet cg cg cg cg cg cg"
+      "nums nums nums turbo turbo turbo play play play play play play";
   }
 }
 
@@ -114,10 +114,7 @@
   .altina .top .mailb { grid-area: cap; }
   .altina .capslot { display: flex; grid-area: cap; align-items: center; min-width: 0; min-height: 64px; }
   .altina.has-mail .capslot { display: none; }
-  .altina .ballsec, .altina .trail { display: none; }
-  .altina .strip { display: grid; }
   .altina .xpanel { grid-row: ball-start / prize-end; grid-column: 1 / -1; }
-  .altina.x-on .strip, .altina.x-on .ptab { display: none; }
   .altina .bar { display: flex; flex-direction: column; gap: var(--gap); }
   .altina .bar .rowa, .altina .bar .rowb { display: flex; gap: var(--gap); align-items: stretch; min-width: 0; }
   .altina .bar .rowa .grp { flex: 1 1 0; min-width: 0; }
