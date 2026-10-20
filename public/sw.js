@@ -1,33 +1,55 @@
-// Service worker do Altina da Sorte: funciona offline.
-// Estratégia: app shell pré-cacheado; /assets e /audio em cache-first com preenchimento em execução.
-const VERSION = 'v2';
+// Service worker do Altina da Sorte: funciona offline desde a primeira visita.
+// - App shell (HTML, JS/CSS com hash, ícones) pré-cacheado na instalação.
+// - Pacote de voz (manifest.json + clipes) baixado em segundo plano, ainda na instalação.
+// - /assets e /audio: cache-first com preenchimento em execução; manifests de voz: rede primeiro.
+// BUILD_ID é trocado a cada build (vite.config.ts), então todo deploy gera um SW novo e limpa os caches antigos.
+const VERSION = 'v2-__BUILD_ID__';
 const SHELL = `altina-shell-${VERSION}`;
 const RUNTIME = `altina-runtime-${VERSION}`;
+const VOICE_DIRS = ['/audio/voice', '/audio/voice-custom'];
+
+async function precacheVoice() {
+  const rt = await caches.open(RUNTIME);
+  const urls = [];
+  for (const dir of VOICE_DIRS) {
+    try {
+      const res = await fetch(`${dir}/manifest.json`, { cache: 'reload' });
+      if (!res.ok || (res.headers.get('content-type') || '').includes('html')) continue;
+      await rt.put(`${dir}/manifest.json`, res.clone());
+      const m = await res.json();
+      const list = Array.isArray(m) ? m : m.ids || m.files || [];
+      for (const e of list) {
+        if (typeof e !== 'string') continue;
+        if (/\.(webm|mp3|ogg|m4a|wav)$/.test(e)) urls.push(`${dir}/${e}`);
+        else for (const ext of ['webm', 'mp3']) urls.push(`${dir}/${e}.${ext}`);
+      }
+    } catch (_) { /* sem pacote de voz: o runtime cuida */ }
+  }
+  let i = 0;
+  const worker = async () => {
+    while (i < urls.length) {
+      const u = urls[i++];
+      try {
+        const r = await fetch(u);
+        if (r.ok && !(r.headers.get('content-type') || '').includes('html')) await rt.put(u, r);
+      } catch (_) { /* melhor esforço */ }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+}
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches
-      .open(SHELL)
-      .then(async (c) => {
-        await c.addAll(['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon.svg']);
-        // pré-cacheia os JS/CSS do app (nomes com hash) lidos do HTML
-        const html = await (await fetch('/', { cache: 'reload' })).text();
-        const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
-        await c.addAll(urls);
-        // pacote de voz: baixa em segundo plano (melhor esforço; não falha a instalação)
-        try {
-          const m = await (await fetch('/audio/voice/manifest.json')).json();
-          await c.put('/audio/voice/manifest.json', await fetch('/audio/voice/manifest.json'));
-          const rt = await caches.open(RUNTIME);
-          for (const id of m.ids || []) {
-            for (const ext of ['webm', 'mp3']) {
-              const u = `/audio/voice/${id}.${ext}`;
-              try { const r = await fetch(u); if (r.ok) await rt.put(u, r); } catch (e) { /* ignora */ }
-            }
-          }
-        } catch (e) { /* sem voz pré-baixada: o runtime cuida */ }
-      })
-      .then(() => self.skipWaiting()),
+    (async () => {
+      const c = await caches.open(SHELL);
+      await c.addAll(['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon.svg']);
+      // JS/CSS com hash lidos do HTML atual
+      const html = await (await fetch('/', { cache: 'reload' })).text();
+      const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+      await c.addAll(urls);
+      await self.skipWaiting();
+      await precacheVoice();
+    })(),
   );
 });
 
@@ -50,11 +72,29 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(SHELL).then((c) => c.put('/', copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(SHELL).then((c) => c.put('/', copy));
+          }
           return res;
         })
         .catch(() => caches.match('/', { ignoreVary: true })),
+    );
+    return;
+  }
+
+  // manifests de voz: rede primeiro (atualizações de clipes), cache se offline
+  if (url.pathname.endsWith('/manifest.json')) {
+    e.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(RUNTIME).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req, { ignoreVary: true }).then((h) => h || Response.error())),
     );
     return;
   }
