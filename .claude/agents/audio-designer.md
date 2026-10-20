@@ -13,3 +13,6 @@ Você é o designer de áudio. Responsável por: src/audio/**, public/audio/**, 
 
 ## v2 (docs/SPEC-v2.md seção 5)
 Roteiro 1–90, novas falas, bordões, som do globo, jingles por prêmio, correções M4/M12, `npm run audio:preview` (WAV). NÃO gerar voz com API paga sem autorização do orquestrador/usuário.
+
+## v3 (docs/SPEC-v3.md seção 3.5.4)
+Música pré-renderizada (OfflineAudioContext) em vez de agendamento contínuo; decodificação sob demanda com limite de memória; AudioContext suspenso quando parado.

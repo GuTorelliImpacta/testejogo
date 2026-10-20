@@ -1,4 +1,4 @@
-import type { Card, GamePhase, PatternId, RoundSummary, Settings } from './types';
+import type { AdminStats, Card, DeviceInfo, GamePhase, PatternId, RoundSummary, RuntimeTuning, Settings } from './types';
 
 /** Fotografia somente-leitura do jogo para a UI desenhar. */
 export interface GameView {
@@ -47,11 +47,23 @@ export interface GameApi {
   claimMail(): void; // PEGAR
   setAuto(on: boolean): void;
   updateSettings(p: Partial<Settings>): void;
-  /** Painel admin */
+  /** Painel do neto (PIN). Tudo exige `unlock` antes. */
   admin: {
     unlock(pin: string): boolean;
-    snapshot(): unknown;
-    exportJson(): string;
+    lock(): void;
+    /** Estatísticas legíveis (null se bloqueado). */
+    stats(): AdminStats | null;
+    /** Dados do aparelho + FPS (null se bloqueado). */
+    device(): DeviceInfo | null;
+    getTuning(): RuntimeTuning;
+    /** Muda parte dos ajustes; vale a partir da PRÓXIMA rodada. */
+    setTuning(p: Partial<RuntimeTuning>): void;
+    resetTuning(): void; // "Restaurar padrão" (a UI confirma antes)
+    /** Troca o PIN (o novo vale no lugar do padrão). Falso se o antigo não confere ou o novo é inválido. */
+    changePin(oldPin: string, newPin: string): boolean;
+    /** `?resetpin=1`: volta ao PIN padrão se `defaultPin` for o padrão de config.ts. */
+    resetPin(defaultPin: string): boolean;
+    exportJson(): string; // inclui tuning e PIN
     importJson(s: string): boolean;
     resetJackpot(): void;
     resetCredits(): void;

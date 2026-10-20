@@ -1,4 +1,4 @@
-import type { PatternId, Settings } from './types';
+import type { PatternId, RuntimeTuning, Settings } from './types';
 
 export const GAME_NAME = 'Altina da Sorte🍀';
 export const PLAYER = 'Dona Altina';
@@ -92,3 +92,35 @@ export function getPatternSet(): PatternSetName {
 export function setPatternSet(name: PatternSetName): void {
   patternSetName = name;
 }
+
+
+// ---------- v3: ajustes em tempo de execução ----------
+export const DEFAULT_TUNING: RuntimeTuning = {
+  bingosPorMes: '2-3',
+  premiosDoDia: 'normal',
+  ofertaExtra: 'normal',
+  chanceGratis: 'normal',
+  custoExtra: 'normal',
+  presente: 1000,
+  correioDiario: 300,
+  conjuntoPadroes: 'classico',
+};
+
+/** Parâmetros de bingo por opção do painel. Calibrados pelo `odds-director` no simulador. */
+export const BINGO_PRESETS: Record<
+  RuntimeTuning['bingosPorMes'],
+  { bingoPorMesAlvo: number; bingoMaxPorMes: number; diasMinEntreBingos: number; diasAlvoEntreBingos: number; diasForcarBingo: number }
+> = {
+  '1': { bingoPorMesAlvo: 1, bingoMaxPorMes: 1, diasMinEntreBingos: 14, diasAlvoEntreBingos: 24, diasForcarBingo: 33 },
+  '2': { bingoPorMesAlvo: 2, bingoMaxPorMes: 2, diasMinEntreBingos: 9, diasAlvoEntreBingos: 14, diasForcarBingo: 19 },
+  '2-3': { bingoPorMesAlvo: TUNING.bingoPorMesAlvo, bingoMaxPorMes: TUNING.bingoMaxPorMes, diasMinEntreBingos: TUNING.diasMinEntreBingos, diasAlvoEntreBingos: TUNING.diasAlvoEntreBingos, diasForcarBingo: TUNING.diasForcarBingo },
+  '3-4': { bingoPorMesAlvo: 3.5, bingoMaxPorMes: 4, diasMinEntreBingos: 5, diasAlvoEntreBingos: 8, diasForcarBingo: 11 },
+};
+
+/** PIN do painel quando o neto não trocou (data.adminPin == null). Ver ADMIN_PIN acima. */
+export function effectivePin(saved: string | null | undefined): string {
+  return saved && /^\d{4}$/.test(saved) ? saved : ADMIN_PIN;
+}
+
+/** Fator do custo da bola extra (8% do maior ganho adicional; "mais barata" = 4%). */
+export const COST_FACTOR: Record<RuntimeTuning['custoExtra'], number> = { normal: 0.08, barata: 0.04 };

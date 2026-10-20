@@ -13,3 +13,6 @@ Você é o revisor de QA. Acesso de leitura ao código; escreve apenas tests/e2e
 
 ## v2 (docs/SPEC-v2.md seção 7)
 Checklist da seção 7; relatório docs/qa/review-fase2.md.
+
+## v3 (docs/SPEC-v3.md seção 4)
+Checklist da seção 4; docs/qa/review-fase3.md; viewports da 1.5 via QA_VP.

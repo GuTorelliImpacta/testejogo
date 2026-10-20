@@ -13,3 +13,6 @@ Você é o diretor de probabilidades. Responsável por: src/director.ts, drawBui
 
 ## v2 (docs/SPEC-v2.md seção 4)
 Recalibrar para 90 bolas, 9 extras, bola grátis (`plan.free`, 15–20% das ofertas), conjunto de padrões ativo e as metas: sem prêmio 55–62%, ≥1 Linha 30–38%, linha dupla 5–8%, oferta de extra 25–35%, RTP comum ≈0,88, ≤~20 recargas em 90 dias no perfil de 120/dia, 2–3 bingos/mês, primeiro bingo entre o 3º e 10º dia. Simulador imprime também frequência da bola grátis e do pagamento parcial do acumulado.
+
+## v3 (docs/SPEC-v3.md seção 2.3)
+Tuning em tempo de execução: `planRound` recebe `tuning: RuntimeTuning`; presets calibrados no simulador (`--preset`); BINGO_PRESETS em config.ts é seu para calibrar.

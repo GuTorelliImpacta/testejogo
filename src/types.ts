@@ -126,7 +126,7 @@ export interface SavedRound {
 }
 
 export interface SaveData {
-  version: 2;
+  version: 3;
   credits: number;
   bet: number;
   cards: Card[];
@@ -137,6 +137,55 @@ export interface SaveData {
   stats: Stats;
   lastDailyBonus: string; // "2026-10-20" (dia em que o correio diário foi pego)
   mail: MailState;
+  tuning: RuntimeTuning; // ajustes do painel do neto (valem a partir da próxima rodada)
+  adminPin: string | null; // PIN trocado pelo neto; null = padrão de config.ts
   turboRounds: number; // rodadas jogadas (para liberar o modo leve automático após 3)
   round?: SavedRound | null;
+}
+
+// ---------- v3: painel do neto ----------
+export type Level3 = 'menos' | 'normal' | 'mais';
+
+/** Ajustes em tempo de execução (presets nomeados; o Diretor traduz para números). */
+export interface RuntimeTuning {
+  bingosPorMes: '1' | '2' | '2-3' | '3-4';
+  premiosDoDia: Level3; // linha / linha dupla: RTP comum e % de rodadas sem prêmio
+  ofertaExtra: Level3; // frequência de oferta de bola extra
+  chanceGratis: Level3; // chance de a extra ser grátis
+  custoExtra: 'barata' | 'normal';
+  presente: 500 | 1000 | 2000; // recarga quando o saldo acaba
+  correioDiario: 300 | 500;
+  conjuntoPadroes: 'classico' | 'variado';
+}
+
+/** Estatísticas legíveis para o painel (substitui o JSON cru). */
+export interface AdminStats {
+  creditos: number;
+  acumulado: number;
+  bingosNoMes: number;
+  ultimosBingos: string[]; // datas pt-BR, mais recente primeiro (até 8)
+  diasDesdeUltimoBingo: number | null;
+  rodadas: number;
+  rodadasPorDia: number;
+  premiosPorTipo: Partial<Record<PatternId, number>>;
+  rtpComum: number;
+  rtpTotal: number;
+  recargas: number;
+  tuning: RuntimeTuning;
+}
+
+/** Dados do aparelho para a aba "Aparelho" (preenchido por src/perf.ts). */
+export interface DeviceInfo {
+  userAgent: string;
+  chromeVersion: string | null;
+  deviceMemory: number | null;
+  cores: number | null;
+  screen: string; // "1280x800 @1"
+  viewport: string;
+  dpr: number;
+  fpsMedio: number | null; // últimas rodadas
+  piorQuadroMs: number | null;
+  memoriaJsMB: number | null;
+  modoEconomico: boolean;
+  sw: string; // versão do service worker/cache, se conhecida
 }

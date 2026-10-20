@@ -13,3 +13,6 @@ Você é o engenheiro de performance/PWA. Responsável por: src/main.ts, storage
 
 ## v2 (docs/SPEC-v2.md seção 6)
 Lighthouse medido, M7/M8/M10, SW v2 com cache de voz, migração, deploy Vercel.
+
+## v3 (docs/SPEC-v3.md seções 3 e 3.5)
+Otimização máxima p/ tablet fraco, compatibilidade navegador antigo, src/perf.ts (aba Aparelho), rotação no meio da rodada, SW v3, deploy.
