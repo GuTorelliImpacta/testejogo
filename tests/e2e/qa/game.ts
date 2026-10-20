@@ -116,30 +116,24 @@ async function until(pred: () => boolean, ms = 30000, step = 10): Promise<boolea
     const g = mk();
     g.enter();
     const balls = () => evs('ballDrawn');
-    await until(() => balls().length >= 2, 10000);
+    await until(() => balls().length >= (name === 'turbo-mid' ? 2 : 1), 10000);
     if (name === 'turbo-mid') {
       const tOn = Date.now();
       g.setTurbo(true);
       chk('turboChanged emitido', evs('turboChanged').some((e) => e.p.on === true));
       chk('fase continua drawing', g.getView().phase === 'drawing');
-      await until(() => balls().length >= 30, 15000);
-      const after = balls().filter((e) => e.t >= tOn - t0 + 0);
-      const gaps = after.slice(1).map((e, i) => e.t - after[i].t);
+      await until(() => g.getView().drawn.length >= 30, 15000);
       const tEnd = Date.now() - tOn;
-      chk('as bolas restantes caem em ~120 ms (Turbo no meio da rodada)', gaps.length > 5 && Math.max(...gaps) <= 200 && gaps.reduce((a, b) => a + b, 0) / gaps.length < 150, `n=${gaps.length} média=${(gaps.reduce((a, b) => a + b, 0) / gaps.length).toFixed(0)}ms máx=${Math.max(...gaps)}ms; 30 bolas em ${tEnd}ms após ligar`);
-      chk('ballDrawn.fast=true depois do Turbo', after.slice(1).every((e) => e.p.fast === true));
+      const after = balls().filter((e) => e.t >= tOn - t0);
+      // v2.1: Turbo = todas as bolas restantes de uma vez (um único ballDrawn com fast=true)
+      chk('Turbo no meio: as bolas restantes saem de uma vez (< 400 ms)', tEnd < 400, `30 bolas ${tEnd}ms após ligar`);
+      chk('um único ballDrawn (fast=true) para o lote do Turbo', after.length === 1 && after[0].p.fast === true, `n=${after.length}`);
       chk('áudio recebeu setFast(true)', calls.setFast.includes(true));
-      const w0 = calls.waitForSpeech;
-      chk('em Turbo o laço não espera a fala (waitForSpeech não chamado nas bolas turbo)', true, `chamadas totais=${w0}`);
-      chk('ligar o turbo acordou o sono de 2 s (1ª bola turbo < 400 ms depois)', after.length > 0 && after[0].t - (tOn - t0) < 400, `${after[0] ? after[0].t - (tOn - t0) : '-'}ms`);
     } else {
-      await until(() => balls().length >= 5, 10000);
-      const tOff = Date.now() - t0;
+      // v2.1: com Turbo ligado desde o início, as 30 bolas saem de uma vez
+      chk('Turbo desde o início: 30 bolas já no histórico', g.getView().drawn.length === 30, `drawn=${g.getView().drawn.length}`);
       g.setTurbo(false);
-      await until(() => balls().length >= 8, 20000);
-      const after = balls().filter((e) => e.t >= tOff);
-      const gaps = after.slice(1).map((e, i) => e.t - after[i].t);
-      chk('desligar o Turbo no meio volta a 2000 ms (velocidade lenta)', gaps.length > 0 && gaps.every((x) => x >= 1800), `gaps=${gaps.join(',')}`);
+      chk('desligar o Turbo depois não quebra a rodada', ['drawing', 'extraOffer', 'settling', 'idle', 'celebrating'].includes(g.getView().phase), g.getView().phase);
     }
     if (name === 'turbo-mid') {
       await until(() => ['idle', 'celebrating', 'extraOffer'].includes(g.getView().phase), 20000);
@@ -449,10 +443,10 @@ async function until(pred: () => boolean, ms = 30000, step = 10): Promise<boolea
     g.setAuto(true);
     await wait(500);
     chk('auto com correio pendente não joga (por design)', evs('roundStart').length === 0 && g.getView().phase === 'idle');
-    chk('MENOR: o botão Automático segue "ligado" sem rodar', g.getView().auto === true, 'auto=true com correio pendente; ao pegar o correio nada reinicia');
+    chk('Automático fica ligado esperando o correio', g.getView().auto === true);
     g.openMail(); g.claimMail();
     await wait(1500);
-    chk('depois de PEGAR o correio o auto não retoma sozinho (fica "ligado" e parado)', evs('roundStart').length === 0 && g.getView().auto === true);
+    chk('v2.1: depois de PEGAR o correio o automático volta a jogar', evs('roundStart').length >= 1, `roundStart=${evs('roundStart').length}`);
   }
 
   // ----------------------------------------------------------------------------------------------

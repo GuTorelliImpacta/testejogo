@@ -421,3 +421,81 @@
   .altina .confetti { display: none; }
   .altina .pr.win::after { opacity: .85; }
 }
+
+/* ================= ajustes finos v2.1 (responsividade) ================= */
+
+/* Tablets deitados mais baixos (ex.: 960x600, 1024x600, 1280x720):
+   tabela de premios em 2x2 para nao invadir a barra de baixo. */
+@media (orientation: landscape) and (max-height: 780px) {
+  .altina .prows { grid-template-columns: 1fr 1fr; column-gap: 6px; align-content: center; }
+  .altina .pr { min-height: 34px; padding: 2px 8px; font-size: calc(22px * var(--ts)); }
+  .altina .tr-main, .altina .tr-extra { gap: 2px; }
+  .altina .trail { gap: 6px; }
+}
+@media (orientation: landscape) and (max-height: 680px) {
+  .altina .ptab .ph { display: none; }
+  .altina .dlg .pane { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+}
+/* Tablets deitados estreitos: barra de baixo cabe numa linha so */
+@media (orientation: landscape) and (max-width: 1100px) {
+  .altina .g-turbo .ti { display: none; }
+  .altina .btn.g-play { font-size: calc(34px * var(--ts)); letter-spacing: 0; }
+}
+/* Tablet em pe estreito (ex.: 600x960): "Desligado" nao corta */
+@media (orientation: portrait) and (min-width: 600px) and (max-width: 720px) {
+  .altina .g-turbo .ti { display: none; }
+}
+
+/* Celular baixo (ex.: 375x667): sobra altura para as cartelas ficarem legiveis */
+@media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
+  .altina { --gap: 6px; --pad: 6px; }
+  .altina .strip { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 4px 6px; }
+  .altina .strip .counter { font-size: calc(22px * var(--ts)); white-space: nowrap; }
+  .altina .strip .srow { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .altina .strip .srow .tc:nth-child(-n+4) { display: none; }
+  .altina .card-head { min-height: 26px; }
+  .altina .card-num { width: 24px; height: 24px; }
+  .altina .bar .rowa, .altina .bar .rowb { gap: 8px; }
+  .altina .btn.g-play, .altina .bar .rowb .btn { min-height: 68px; }
+  .altina .grp { gap: 2px 10px; }
+}
+/* Na oferta de bola extra em telas mais baixas, o painel da extra ocupa o lugar da tabela de premios
+   (o selo "FALTA 1 -> premio" na cartela ja mostra quanto ela ganha). */
+@media (orientation: landscape) and (max-height: 680px) {
+  .altina.x-on .ptab { display: none; }
+}
+@media (orientation: portrait) and (min-width: 600px) and (max-height: 1100px) {
+  .altina.x-on .ptab { display: none; }
+  .altina .xpanel { gap: 8px; padding: 8px; }
+  .altina .xpanel .btn.big { min-height: 72px; }
+}
+/* texto "Muito grande": numeros do topo e contador nao cortam embaixo */
+.altina .stat .val, .altina .counter { line-height: 1.12; }
+@media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
+  .altina .bar .rowa, .altina .bar .rowb { gap: 12px; }
+  .altina .grp { gap: 2px 12px; }
+  .altina .card-head { min-height: 24px; }
+}
+@media (orientation: landscape) and (max-height: 680px) {
+  .altina.ts-grande .ptab, .altina.ts-muito .ptab { --ts: 1; }
+  .altina.ts-grande .ballsec, .altina.ts-muito .ballsec, .altina.ts-grande .trail, .altina.ts-muito .trail { --ts: 1; }
+}
+@media (orientation: portrait) and (max-width: 599px) and (max-height: 720px) {
+  .altina.ts-grande, .altina.ts-muito { --ts: 1; --tsb: 1; }
+  .altina .xpanel { padding: 6px; gap: 6px; }
+  .altina .xpanel .btn.big { min-height: 64px; font-size: 22px; }
+  .altina .xtitle { font-size: 22px; line-height: 1.05; }
+}
+.altina.ts-muito .stat .lab { letter-spacing: -.03em; }
+/* tabela 2x2 em tablet deitado estreito: nomes curtos (Dupla, Acum.) para o valor nao cortar */
+@media (orientation: landscape) and (max-height: 780px) and (max-width: 1150px) {
+  .altina .pr { font-size: 20px; padding: 2px 6px; gap: 4px; }
+  .altina .pr .full { display: none; }
+  .altina .pr .short { display: inline; }
+}
+@media (orientation: portrait) and (max-width: 820px) {
+  .altina .pr .full { display: none; }
+  .altina .pr .short { display: inline; }
+}
+/* a tabela de premios ja usa letra grande: "Texto grande/muito grande" nao a faz estourar */
+.altina.ts-grande .ptab, .altina.ts-muito .ptab { --ts: 1; }

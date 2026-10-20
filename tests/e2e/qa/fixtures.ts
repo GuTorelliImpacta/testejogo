@@ -9,13 +9,17 @@ export const KEY = 'altina-da-sorte:v2';
 export const KEY_V1 = 'altina-da-sorte:v1';
 export const BASE = process.env.QA_BASE ?? 'http://localhost:4181';
 export const EXE = '/opt/pw-browsers/chromium';
-export const VIEWPORTS = [
+const DEFAULT_VIEWPORTS = [
   { w: 1280, h: 800 },
   { w: 800, h: 1280 },
   { w: 1024, h: 768 },
   { w: 768, h: 1024 },
   { w: 360, h: 740 },
 ];
+/** QA_VP="1180x820,390x844" troca a lista de viewports. */
+export const VIEWPORTS = process.env.QA_VP
+  ? process.env.QA_VP.split(',').map((s) => { const [w, h] = s.split('x').map(Number); return { w, h }; })
+  : DEFAULT_VIEWPORTS;
 
 export function today(): string {
   const d = new Date();

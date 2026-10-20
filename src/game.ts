@@ -93,7 +93,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         cards: session.cards,
         active: session.active,
       };
-    } else {
+    } else if (phase !== 'splash') {
+      // Antes de ENTRAR a rodada salva ainda vai ser retomada: um ajuste nesse momento
+      // (ex.: modo leve automático na abertura) não pode apagá-la (a aposta já foi debitada).
       data.round = null;
     }
     save(data);
@@ -142,15 +144,46 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     fast = turbo();
     audio.setFast(fast);
     while (!s.mainDone && id === runId) {
+      if (fast) {
+        // Turbo: todas as bolas restantes saem de uma vez e as cartelas já aparecem preenchidas.
+        drawAllAtOnce();
+        persist();
+        await sleep(TURBO_MS);
+        break;
+      }
       const step = s.nextMain()!;
       emitStep(step);
       persist();
-      if (!fast) await audio.waitForSpeech();
+      await audio.waitForSpeech();
       if (id !== runId) return;
-      await sleep(fast ? TURBO_MS : SPEED_MS[data.settings.speed]);
+      await sleep(fast ? 0 : SPEED_MS[data.settings.speed]);
     }
     if (id !== runId) return;
     await extraLoop(id);
+  }
+
+  /** Turbo: sorteia o resto das 30 bolas num único passo (um tique, um redesenho, prêmios anunciados juntos). */
+  function drawAllAtOnce(): void {
+    const s = session!;
+    const steps: Step[] = [];
+    while (!s.mainDone) steps.push(s.nextMain()!);
+    if (!steps.length) return;
+    for (const st of steps) {
+      drawn.push(st.ball);
+      current = st.ball;
+    }
+    const last = steps[steps.length - 1];
+    bus.emit('ballDrawn', { ball: last.ball, index: last.index, total: BALLS_MAIN, extra: false, fast: true });
+    for (const st of steps) {
+      for (const w of st.won) {
+        bus.emit('patternWon', { cardIndex: w.cardIndex, pattern: w.pattern, prize: prizeFor(w.pattern, s.bet), ball: st.ball });
+      }
+      if (st.bingo) {
+        bus.emit('bingo', { cardIndex: st.bingo.cardIndex, viaExtra: false });
+        if (s.jackpotAmount > 0) bus.emit('jackpot', { amount: s.jackpotAmount });
+      }
+    }
+    changed();
   }
 
   async function extraLoop(id: number): Promise<void> {
@@ -246,7 +279,11 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
   function maybeAuto(wasBig: boolean): void {
     if (!auto || wasBig || data.mail.pending) {
-      if (wasBig) auto = false;
+      // celebração grande desliga o automático; com correio pendente ele espera o PEGAR (claimMail retoma)
+      if (wasBig && auto) {
+        auto = false;
+        changed();
+      }
       return;
     }
     setTimeout(() => {
@@ -268,6 +305,13 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
   function maybeBonusMail(): void {
     rollMailDay();
+    // tablet ficou aberto e virou o dia: o correio diário chega sem precisar reabrir o jogo
+    const today = dayKey(now());
+    if (data.lastDailyBonus !== today && !data.mail.pending) {
+      data.mail.pending = { kind: 'daily', amount: MAIL.dailyAmount };
+      bus.emit('mailbox', { kind: 'daily', amount: MAIL.dailyAmount, state: 'arrived' });
+      return;
+    }
     const m = data.mail;
     if (m.pending || m.bonusToday >= MAIL.bonusMaxPerDay) return;
     if (m.playMs < (m.bonusToday + 1) * MAIL.minPlayMsBeforeBonus) return;
@@ -439,6 +483,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       persist(false);
       saveNow(data);
       changed();
+      maybeAuto(false); // automático ligado volta a jogar depois de pegar o correio
     },
 
     changeBet(dir) {
