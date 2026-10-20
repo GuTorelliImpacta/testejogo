@@ -43,6 +43,7 @@ const allErrs: string[] = [];
     const nums = spk.filter((t) => /!$/.test(t));
     note(`primeiras legendas faladas: ${spk.slice(0, 10).join(' | ')}`);
     chk('nenhuma fala sintetizada (speechSynthesis) quando há clipes (voz = clipes pré-gravados)', l.utter.length === 0, `utter=${l.utter.length} ${JSON.stringify(l.utter.slice(0, 3))}`);
+    chk('só a SAUDAÇÃO escapa do clipe? (utter limitado à saudação)', l.utter.every((u) => /Vamos jogar/.test(u.text)), JSON.stringify(l.utter.map((u) => u.text)));
     chk('0 setInterval durante a rodada', l.intervals === 0, `intervals=${l.intervals}`);
     const v1 = await saved(p);
     note(`créditos(save) ${v0.credits} -> ${v1.credits}; rodadas=${v1.stats.rodadas}`);
@@ -251,36 +252,38 @@ const allErrs: string[] = [];
     await enter(p);
     const betVal = () => p.locator('.g-bet .l2').textContent();
     const cardsVal = () => p.locator('.g-cards .l2').textContent();
-    const rows = () => p.locator('.ptab .pr').allTextContents();
+    const rows = async () => (await p.locator('.ptab .pr').evaluateAll((els) => els.map((e) => `${e.querySelector('.nm .full')?.textContent}=${e.querySelector('.pv')?.textContent}`)));
+    const clk = async (sel: string, n: number) => { for (let i = 0; i < n; i++) { await p.locator(sel).click({ force: true }); await p.waitForTimeout(140); } };
     const seq: string[] = [];
-    for (let i = 0; i < 12; i++) await p.locator('.g-bet .sq').nth(0).click({ force: true }); // −
+    await clk('.g-bet .sq >> nth=0', 12); // −
     chk('aposta mínima 1; botão − desabilitado', (await betVal()) === '1' && (await p.locator('.g-bet .sq').nth(0).isDisabled()));
     const t1 = await rows();
-    chk('bet=1: tabela Linha 5 / Linha dupla 25 / BINGO 500 / "Acumulado: 50%" com valor 2.500', /Linha\s*5$/.test(t1[0].replace(/\s+/g, ' ').trim().replace('Linha ', 'Linha')) || /5$/.test(t1[0]), JSON.stringify(t1));
+    chk('bet=1: tabela Linha=5 / Linha dupla=25 / BINGO=500 / "Acumulado: 50%" = 2.500', t1.join('|') === 'Linha=5|Linha dupla=25|BINGO=500|Acumulado: 50%=2.500', JSON.stringify(t1));
     seq.push(JSON.stringify(t1));
-    await p.locator('.g-bet .sq').nth(1).click(); await p.waitForTimeout(450);
+    await clk('.g-bet .sq >> nth=1', 1); await p.waitForTimeout(200);
     const t2 = await rows();
     note(`bet=2: ${JSON.stringify(t2)}`);
-    chk('bet=2: acumulado 75% (3.750)', /75%/.test(t2[3]) && /3\.750/.test(t2[3]), t2[3]);
-    await p.locator('.g-bet .sq').nth(1).click(); await p.waitForTimeout(450);
+    chk('bet=2: Linha=10, Linha dupla=50, BINGO=1.000, Acumulado: 75% = 3.750', t2.join('|') === 'Linha=10|Linha dupla=50|BINGO=1.000|Acumulado: 75%=3.750', t2.join('|'));
+    await clk('.g-bet .sq >> nth=1', 1); await p.waitForTimeout(200);
     const t3 = await rows();
-    chk('bet=3: Acumulado cheio (5.000) sem %', !/%/.test(t3[3]) && /5\.000/.test(t3[3]), JSON.stringify(t3));
-    for (let i = 0; i < 12; i++) { await p.locator('.g-bet .sq').nth(1).click({ force: true }); await p.waitForTimeout(0); }
+    chk('bet=3: Acumulado cheio (5.000) sem %', t3.join('|') === 'Linha=15|Linha dupla=75|BINGO=1.500|Acumulado=5.000', JSON.stringify(t3));
+    await clk('.g-bet .sq >> nth=1', 12);
     await p.waitForTimeout(300);
     const t10 = await rows();
-    chk('aposta máxima 10: Linha 50, Linha dupla 250, BINGO 5.000; + desabilitado', (await betVal()) === '10' && /50$/.test(t10[0]) && /250$/.test(t10[1]) && /5\.000$/.test(t10[2]) && (await p.locator('.g-bet .sq').nth(1).isDisabled()), JSON.stringify(t10));
+    chk('aposta máxima 10: Linha 50, Linha dupla 250, BINGO 5.000; + desabilitado', (await betVal()) === '10' && t10.slice(0, 3).join('|') === 'Linha=50|Linha dupla=250|BINGO=5.000' && (await p.locator('.g-bet .sq').nth(1).isDisabled()), JSON.stringify(t10));
     const tot = await p.locator('button.play .ps').textContent();
     chk('JOGAR mostra "Total 40" (10 × 4)', /40/.test(tot!), tot ?? '');
     // todas as apostas 1..10 percorridas
     const seen: string[] = [];
-    for (let i = 0; i < 10; i++) { seen.push((await betVal())!); if (i < 9) { await p.locator('.g-bet .sq').nth(0).click({ force: true }); await p.waitForTimeout(0); } }
+    for (let i = 0; i < 10; i++) { seen.push((await betVal())!); if (i < 9) await clk('.g-bet .sq >> nth=0', 1); }
     chk('percorre 10,9,...,1 pelos botões', seen.join() === '10,9,8,7,6,5,4,3,2,1', seen.join());
     // cartelas
-    for (let i = 0; i < 6; i++) await p.locator('.g-cards .sq').nth(0).click({ force: true });
+    await clk('.g-cards .sq >> nth=0', 6);
     chk('Cartelas mínimo 1: só a cartela 1 ativa, 3 "Desligada"', (await cardsVal()) === '1' && (await p.locator('.card.off').count()) === 3);
-    for (const [i, n] of [[2, 2], [3, 3], [4, 4]] as const) { await p.locator('.g-cards .sq').nth(1).click(); await p.waitForTimeout(0); chk(`Cartelas ${n}: ${n} ativas`, (await cardsVal()) === String(n) && (await p.locator('.card:not(.off)').count()) === n); void i; }
+    for (const [i, n] of [[2, 2], [3, 3], [4, 4]] as const) { await clk('.g-cards .sq >> nth=1', 1); chk(`Cartelas ${n}: ${n} ativas`, (await cardsVal()) === String(n) && (await p.locator('.card:not(.off)').count()) === n); void i; }
     chk('Cartelas máx 4: + desabilitado', await p.locator('.g-cards .sq').nth(1).isDisabled());
     // tocar na cartela não faz nada
+    await p.waitForTimeout(500); // deixa o debounce de 200 ms do save gravar
     const before = JSON.stringify({ a: (await saved(p)).active, off: await p.locator('.card.off').count(), total: await p.locator('button.play .ps').textContent() });
     for (let i = 0; i < 4; i++) { await p.locator('.cards .card').nth(i).click({ force: true }); await p.locator('.cards .card').nth(i).locator('.cell').nth(7).click({ force: true }); }
     await p.waitForTimeout(500);
