@@ -1,0 +1,55 @@
+import { PLAYER } from './config';
+import type { PatternId } from './types';
+
+export const T = {
+  title: 'Altina da Sorte🍀',
+  enter: '🍀 ENTRAR',
+  play: 'JOGAR',
+  auto: 'Automático',
+  accelerate: 'Acelerar',
+  swapCards: 'Trocar cartelas',
+  prizes: 'Prêmios',
+  settings: 'Ajustes',
+  extraBall: (cost: number) => `BOLA EXTRA (custa ${cost})`,
+  finish: 'TERMINAR',
+  continue: 'CONTINUAR',
+  take: 'PEGAR',
+  credits: 'Créditos',
+  jackpot: 'Acumulado',
+  bet: 'Aposta por cartela',
+  totalBet: 'Total',
+  almost: 'FALTA 1!',
+  giftTitle: `🍀 Presente pra ${PLAYER}!`,
+  giftBody: (n: number) => `+${n} créditos`,
+  dailyTitle: `Bom dia, ${PLAYER}! Seu presente de hoje!`,
+  won: 'Ganhou!',
+  nextTime: 'Na próxima vai!',
+  bingoBig: 'BINGO!!!',
+  congrats: `Parabéns, ${PLAYER}!`,
+  jackpotWon: `ACUMULADO! A ${PLAYER} levou tudo!`,
+  extraOffer: `Bola extra! Vai, ${PLAYER}!`,
+  luck: `Boa sorte, ${PLAYER}!`,
+  greet(hour: number): string {
+    const p = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+    return `${p}, ${PLAYER}! Vamos jogar?`;
+  },
+  patternNames: {
+    linha: 'Linha',
+    cantos: 'Cantos',
+    piramide: 'Pirâmide',
+    u: 'U',
+    linhaDupla: 'Linha dupla',
+    moldura: 'Moldura',
+    bingo: 'BINGO',
+  } as Record<PatternId, string>,
+  patternShout: {
+    linha: 'Linhaaa!',
+    cantos: 'Cantos!',
+    piramide: 'Pirâmide!',
+    u: 'Deu U!',
+    linhaDupla: 'Linha duplaaa!',
+    moldura: 'Moldura! Que beleza!',
+    bingo: 'BINGOOO!!!',
+  } as Record<PatternId, string>,
+  ballCaption: (n: number) => `Bola ${n}!`,
+};
