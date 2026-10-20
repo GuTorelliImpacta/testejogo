@@ -51,7 +51,16 @@ export function btn(cls: string, label: string, onPress?: () => void, debounce =
   return b;
 }
 
-export const fmt = (n: number): string => Math.round(n).toLocaleString('pt-BR');
+// Intl.NumberFormat criado uma vez (toLocaleString recria o formatador a cada chamada: caro em tablet fraco)
+let nf: Intl.NumberFormat | null = null;
+export const fmt = (n: number): string => {
+  const r = Math.round(n);
+  try {
+    return (nf ?? (nf = new Intl.NumberFormat('pt-BR'))).format(r);
+  } catch {
+    return r.toLocaleString('pt-BR');
+  }
+};
 
 /** faixa da bola (blocos de BALL_BAND = 18): 1..5 */
 export const range = (n: number): number => Math.min(5, Math.max(1, Math.floor((n - 1) / BALL_BAND) + 1));

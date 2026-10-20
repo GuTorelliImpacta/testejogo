@@ -3,9 +3,12 @@
 // - Pacote de voz (manifest.json + clipes) baixado em segundo plano, ainda na instalação.
 // - /assets e /audio: cache-first com preenchimento em execução; manifests de voz: rede primeiro.
 // BUILD_ID é trocado a cada build (vite.config.ts), então todo deploy gera um SW novo e limpa os caches antigos.
-const VERSION = 'v2-__BUILD_ID__';
+// v3: o cache do app (SHELL) é versionado por build; o pacote de voz (RUNTIME) só muda quando os manifests de voz mudam
+// (VOICE_ID), então um deploy novo não rebaixa ~1 MB de voz. Caches de versões anteriores (v2...) são apagados no activate.
+// Compatível com Chrome/WebView ~60: sem matchAll, sem sintaxe nova.
+const VERSION = 'v3-__BUILD_ID__';
 const SHELL = `altina-shell-${VERSION}`;
-const RUNTIME = `altina-runtime-${VERSION}`;
+const RUNTIME = `altina-runtime-v3-__VOICE_ID__`;
 const VOICE_DIRS = ['/audio/voice', '/audio/voice-custom'];
 
 async function precacheVoice() {
@@ -30,6 +33,7 @@ async function precacheVoice() {
     while (i < urls.length) {
       const u = urls[i++];
       try {
+        if (await rt.match(u)) continue; // já está no cache de voz (mesma versão do pacote)
         const r = await fetch(u);
         if (r.ok && !(r.headers.get('content-type') || '').includes('html')) await rt.put(u, r);
       } catch (_) { /* melhor esforço */ }
@@ -45,7 +49,10 @@ self.addEventListener('install', (e) => {
       await c.addAll(['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon.svg']);
       // JS/CSS com hash lidos do HTML atual
       const html = await (await fetch('/', { cache: 'reload' })).text();
-      const urls = [...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]);
+      const urls = [];
+      const re = /(?:src|href)="(\/assets\/[^"]+)"/g;
+      let m;
+      while ((m = re.exec(html))) urls.push(m[1]);
       await c.addAll(urls);
       await self.skipWaiting();
       await precacheVoice();
@@ -106,7 +113,8 @@ self.addEventListener('fetch', (e) => {
         fetch(req).then((res) => {
           if (res.ok && res.status === 200) {
             const copy = res.clone();
-            caches.open(RUNTIME).then((c) => c.put(req, copy));
+            // voz fica no cache estável; o resto (JS/CSS/ícones) no cache versionado do build
+            caches.open(url.pathname.indexOf('/audio/') === 0 ? RUNTIME : SHELL).then((c) => c.put(req, copy));
           }
           return res;
         }),

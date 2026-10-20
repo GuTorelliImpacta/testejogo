@@ -90,7 +90,9 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
   balls.capHost.append(captions.el);
   const phoneMq = window.matchMedia('(orientation: portrait) and (max-width: 599px)');
   const placeCaption = () => (phoneMq.matches ? capSlot : balls.capHost).append(captions.el);
-  phoneMq.addEventListener?.('change', placeCaption);
+  // MediaQueryList antigo (Chrome < 45... WebView velho) só tem addListener
+  if (phoneMq.addEventListener) phoneMq.addEventListener('change', placeCaption);
+  else if (phoneMq.addListener) phoneMq.addListener(placeCaption);
   placeCaption();
 
   // ---- splash ----
@@ -125,6 +127,20 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
   let creditRaf = 0;
 
   const isLight = () => root.classList.contains('light');
+
+  // Diametro do carimbo das cartelas: medido SO aqui (resize, rotacao, mudanca de layout), num rAF; nunca durante o sorteio.
+  let measureRaf = 0;
+  let layoutKey = '';
+  const scheduleMeasure = () => {
+    if (!measureRaf) {
+      measureRaf = requestAnimationFrame(() => {
+        measureRaf = 0;
+        cards.measure();
+      });
+    }
+  };
+  addEventListener('resize', scheduleMeasure);
+  addEventListener('orientationchange', scheduleMeasure);
 
   function showCredits(target: number): void {
     cancelAnimationFrame(creditRaf);
@@ -194,9 +210,14 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
     const offerOn = xpanel.update(v);
     setCls(root, 'x-on', offerOn);
     setCls(root, 'has-mail', !!v.mail && !v.mail.open && v.phase === 'idle');
+    const lk = `${ts}|${offerOn}|${root.classList.contains('has-mail')}|${v.phase === 'splash'}`;
+    if (lk !== layoutKey) {
+      layoutKey = lk;
+      scheduleMeasure();
+    }
 
     const drawing = v.phase === 'drawing' || v.phase === 'extraDrawing' || v.phase === 'extraOffer';
-    cards.update({
+    const fresh = cards.update({
       cards: v.cards,
       active: v.active,
       drawn: v.drawn,
@@ -204,6 +225,7 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
       prizeTable: v.prizeTable,
       offer: v.phase === 'extraOffer' ? v.extraOffer : null,
     });
+    if (fresh > 4 && !s.light) cards.pulse();
     balls.update({ drawn: v.drawn, current: v.current, counter: counterText(v) });
     prizes.update(v);
     controls.update(v);
@@ -263,9 +285,13 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
     destroy() {
       unsubs.forEach((f) => f());
       cancelAnimationFrame(creditRaf);
+      cancelAnimationFrame(measureRaf);
+      removeEventListener('resize', scheduleMeasure);
+      removeEventListener('orientationchange', scheduleMeasure);
       captions.destroy();
       modals.destroy();
-      phoneMq.removeEventListener?.('change', placeCaption);
+      if (phoneMq.removeEventListener) phoneMq.removeEventListener('change', placeCaption);
+      else if (phoneMq.removeListener) phoneMq.removeListener(placeCaption);
       root.textContent = '';
       root.classList.remove('altina', 'nogap', 'light', 'x-on', 'has-mail', 'ts-normal', 'ts-grande', 'ts-muito');
     },

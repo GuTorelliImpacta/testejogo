@@ -32,7 +32,11 @@ export interface CardsView {
     showAlmost: boolean;
     prizeTable: { pattern: PatternId; prize: number }[];
     offer: Offer;
-  }): void;
+  }): number;
+  /** Diametro do carimbo (--cd): mede UMA celula; chamar so em resize/rotacao/mudanca de layout (le o layout). */
+  measure(): void;
+  /** Lote grande (Turbo): uma unica animacao curta de opacidade no conjunto das cartelas (sem carimbo por celula). */
+  pulse(): void;
   flash(i: number): void;
   popSeal(i: number): void;
   /** premio efetivamente pago (evento patternWon); ate o proximo reset usa-se a tabela */
@@ -107,8 +111,21 @@ export function createCards(): CardsView {
     } else c.classList.remove('mk', 'nw');
   }
 
+  /** Celulas marcadas a partir de uma bola; acima disso (Turbo) nao ha carimbo por celula. */
+  const STAMP_MAX = 4;
+
   return {
     el: root,
+    measure() {
+      const c = ui[0]?.cells[0];
+      if (!c) return;
+      const w = c.clientWidth;
+      const hh = c.clientHeight;
+      if (w > 0 && hh > 0) root.style.setProperty('--cd', Math.round(Math.min(w, hh) * 94) / 100 + 'px');
+    },
+    pulse() {
+      if (root.animate) root.animate([{ opacity: 0.55 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' });
+    },
     update({ cards, active, drawn, showAlmost, prizeTable, offer }) {
       const pats = prizeTable.map((p) => p.pattern).sort((a, b) => levelOf(b) - levelOf(a));
       const bestOf = (m: number): PatternId | null => pats.find((p) => isComplete(m, p)) ?? null;
@@ -116,6 +133,7 @@ export function createCards(): CardsView {
         const cur = levelOf(bestOf(m));
         return pats.find((p) => levelOf(p) > cur && missing(m, p) === 1) ?? null;
       };
+      let marked = 0;
       let full = drawn.length < shown;
       cards.forEach((card, i) => {
         if (ui[i].sig !== card.nums.join(',')) {
@@ -141,19 +159,28 @@ export function createCards(): CardsView {
         });
         shown = drawn.length;
       } else if (drawn.length > shown) {
-        // caminho incremental: so as bolas novas, via Map
+        // caminho incremental: so as bolas novas, via Map. Lote grande (Turbo): sem carimbo por celula.
+        let n = 0;
+        for (let b = shown; b < drawn.length; b++) {
+          const list = byNum.get(drawn[b]);
+          if (list) for (const e of list) if (active[e.card]) n++;
+        }
+        const stamp = n <= STAMP_MAX;
         for (let b = shown; b < drawn.length; b++) {
           const list = byNum.get(drawn[b]);
           if (!list) continue;
           for (const { cell, card } of list) {
             if (!active[card]) continue;
-            cell.classList.add('mk', 'nw');
-            lastNew.push(cell);
+            if (stamp) {
+              cell.classList.add('mk', 'nw');
+              lastNew.push(cell);
+            } else cell.classList.add('mk');
             const k = ui[card].cells.indexOf(cell);
             ui[card].mask |= 1 << k;
           }
         }
         shown = drawn.length;
+        marked = n;
       }
 
       cards.forEach((_, i) => {
@@ -192,6 +219,7 @@ export function createCards(): CardsView {
           setText(u.faltaSh, imp ? U.falta1Short(imp.gain) : T.almost);
         }
       });
+      return marked;
     },
     flash(i) {
       const el = ui[i]?.el;

@@ -192,14 +192,14 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
     const box = h('div', 'confetti', undefined, { 'aria-hidden': 'true' });
     const colors = ['#ffd24a', '#ff5a4d', '#4da3ff', '#5be37d', '#d58bff', '#fff'];
     for (let i = 0; i < n; i++) {
-      const isClover = i % 4 === 3;
+      const isClover = i % 6 === 5;
       const e = h('i', isClover ? 'cl' : '');
       if (isClover) e.innerHTML = cloverSvg();
       else e.style.setProperty('--k', colors[i % colors.length]);
       e.style.setProperty('--x', String(Math.round((i / n) * 96 + 1)));
       e.style.setProperty('--dx', String(((i * 7) % 13) - 6));
-      e.style.setProperty('--dur', (3 + ((i * 5) % 7) * 0.35).toFixed(2) + 's');
-      e.style.setProperty('--dl', (-((i * 3) % 9) * 0.4).toFixed(2) + 's');
+      e.style.setProperty('--dur', (1.6 + ((i * 5) % 7) * 0.07).toFixed(2) + 's'); // 1,6..2,0 s
+      e.style.setProperty('--dl', (((i * 3) % 9) * 0.05).toFixed(2) + 's'); // 0..0,4 s: tudo acaba em <= 2,4 s
       e.style.setProperty('--rot', ((i % 2 ? 1 : -1) * (360 + (i % 5) * 120)) + 'deg');
       box.append(e);
     }
@@ -225,7 +225,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
     C.foot.append(contBtn);
     C.dlg.setAttribute('aria-label', T.congrats);
     if (!light) {
-      confetti = makeConfetti(isBingo || jack ? 36 : 16);
+      confetti = makeConfetti(isBingo || jack ? 18 : 10); // <= ~20 partículas, uma passada de ~2 s; nenhuma no modo econômico
       C.layer.prepend(confetti);
     }
     countUp(prize, s.prize, 1200);

@@ -104,7 +104,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
   const costFactor = () => COST_FACTOR[data.tuning.custoExtra];
   /** Troca de conjunto de padrões só vale fora de rodada (nunca muda o que está em jogo). */
   const applyPatternSet = () => {
-    if (!session) setPatternSet(data.tuning.conjuntoPadroes);
+    if (!session && phase !== 'drawing') setPatternSet(data.tuning.conjuntoPadroes);
   };
 
   function applyAudioSettings(): void {
@@ -145,6 +145,22 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     });
   }
 
+  /** Espera o próximo quadro pintar (e um tique): o toque em JOGAR/Turbo pinta antes do lote pesado (INP baixo). */
+  function nextPaint(): Promise<void> {
+    return new Promise((res) => {
+      let done = false;
+      const go = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(guard);
+        res();
+      };
+      const guard = setTimeout(go, 150); // aba oculta: o rAF não roda
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(go, 0));
+      else setTimeout(go, 0);
+    });
+  }
+
   function emitStep(step: Step, silent = false): void {
     drawn.push(step.ball);
     current = step.ball;
@@ -178,6 +194,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     while (!s.mainDone && id === runId) {
       if (fast) {
         // Turbo: todas as bolas restantes saem de uma vez e as cartelas já aparecem preenchidas.
+        await nextPaint();
+        if (id !== runId) return;
+        if (!fast) continue; // Turbo desligado durante a espera: volta ao bola a bola
         drawAllAtOnce();
         persist();
         await sleep(TURBO_MS);
@@ -450,7 +469,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       const bet = totalBet();
       data.credits -= bet;
       data.jackpot = nextJackpot(data.jackpot, bet);
-      const { plan } = planRound({
+      // Tudo que define a rodada é capturado AGORA (ajustes do painel só valem na próxima); o trabalho pesado
+      // (plano do Diretor, sessão, voz) roda no quadro seguinte, para o toque em JOGAR pintar logo (INP baixo).
+      const planArgs = {
         cards: data.cards,
         active: data.active,
         bet: data.bet,
@@ -458,11 +479,25 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         director: data.director,
         rng: cryptoRng,
         tuning: data.tuning,
+      };
+      const factor = costFactor();
+      const jackpotNow = Math.floor(data.jackpot);
+      const id = ++runId;
+      drawn = [];
+      current = null;
+      summary = null;
+      extraOffer = null;
+      session = null;
+      phase = 'drawing';
+      changed();
+      void nextPaint().then(() => {
+        if (id !== runId || phase !== 'drawing' || session) return;
+        const { plan } = planRound(planArgs);
+        const s = new RoundSession(planArgs.cards, planArgs.active, planArgs.bet, jackpotNow, plan, 0, factor);
+        roundStartedAt = now();
+        bus.emit('roundStart', { bet: planArgs.bet, totalBet: bet });
+        startSession(s);
       });
-      const s = new RoundSession(data.cards, data.active, data.bet, Math.floor(data.jackpot), plan, 0, costFactor());
-      roundStartedAt = now();
-      bus.emit('roundStart', { bet: data.bet, totalBet: bet });
-      startSession(s);
     },
 
     setTurbo(on) {

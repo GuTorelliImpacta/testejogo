@@ -44,12 +44,12 @@ out.errors = errors;
 
 // atualização: muda sw.js (nova versão), simula deploy
 const sw = readFileSync('dist/sw.js', 'utf8');
-writeFileSync('dist/sw.js', sw.replace(/const VERSION = '[^']+'/, "const VERSION = 'v2-teste'"));
+writeFileSync('dist/sw.js', sw.replace(/const VERSION = '[^']+'/, "const VERSION = 'v3-teste'"));
 // cria cache "antigo" que deve ser limpo
 await page.evaluate(() => caches.open('altina-shell-v1').then((c) => c.put('/x', new Response('x'))));
 await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
-for (let i = 0; i < 40; i++) { info = await cacheInfo(); if (info['altina-shell-v2-teste'] && Object.values(info).some((n) => n > 280)) break; await sleep(500); }
-for (let i = 0; i < 20; i++) { info = await cacheInfo(); if (!info['altina-shell-v1'] && !info['altina-shell-v2-031fbbf7']) break; await sleep(500); }
+for (let i = 0; i < 40; i++) { info = await cacheInfo(); if (info['altina-shell-v3-teste'] && Object.values(info).some((n) => n > 280)) break; await sleep(500); }
+for (let i = 0; i < 20; i++) { info = await cacheInfo(); if (!info['altina-shell-v1']) break; await sleep(500); }
 out.cachesAfterUpdate = await cacheInfo();
 // app continua funcionando offline depois da atualização
 await ctx.setOffline(true);

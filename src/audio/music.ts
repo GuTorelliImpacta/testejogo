@@ -624,6 +624,7 @@ export class Music {
   /** Crossfade calmo ↔ animado. */
   setMode(m: MusicMode): void {
     this.mode = m;
+    if (m === 'calm') this.wakeWaiters(); // retoma a pré-renderização parada durante o sorteio
     if (!this.running || !this.ctx) return;
     if (this.usePre) {
       this.syncMode();
@@ -663,7 +664,14 @@ export class Music {
   }
 
   private blocked(): boolean {
-    return this.paused;
+    // Durante o sorteio ('lively') a pré-renderização espera (cada fatia custa CPU na thread principal e disputa
+    // quadros com a animação); só a 1ª variação, de que a música precisa, não espera. Volta no `setMode('calm')`.
+    return this.paused || (this.mode === 'lively' && this.firstVariantReady());
+  }
+  private firstVariantReady(): boolean {
+    const l = this.building ?? this.lib;
+    const v = l?.variants[0];
+    return !!(v && v.calm && v.lively && l!.stingers.size >= 2);
   }
   private wakeWaiters(): void {
     const w = this.waiters;
@@ -756,11 +764,11 @@ export class Music {
     if (!(await this.gate(tok))) return null;
     const rendered = await renderCompat(off);
     if (tok !== this.tok) return null;
-    return this.fold(off, rendered, len, tail, lib.sr);
+    return await this.fold(off, rendered, len, tail, lib.sr);
   }
 
   /** Dobra a cauda sobre o início: o fim "toca por cima" do começo e o loop não tem emenda audível. */
-  private fold(off: OfflineAudioContext, r: AudioBuffer, len: number, tail: number, sr: number): AudioBuffer {
+  private async fold(off: OfflineAudioContext, r: AudioBuffer, len: number, tail: number, sr: number): Promise<AudioBuffer> {
     if (r.length <= len) return r;
     const src = r.getChannelData(0);
     let out: AudioBuffer;
@@ -772,7 +780,12 @@ export class Music {
     const d = out.getChannelData(0);
     d.set(src.subarray(0, len));
     const n = Math.min(tail, r.length - len, len);
-    for (let i = 0; i < n; i++) d[i] += src[len + i];
+    // em blocos (a soma da cauda numa tacada só custava dezenas de ms num tablet fraco)
+    for (let i = 0; i < n; ) {
+      const end = Math.min(n, i + 16384);
+      for (; i < end; i++) d[i] += src[len + i];
+      if (i < n) await this.sleep(0);
+    }
     return out;
   }
 

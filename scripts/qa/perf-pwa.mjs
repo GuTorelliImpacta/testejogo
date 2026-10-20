@@ -56,6 +56,7 @@ async function turbo(page) { await page.getByRole('button', { name: /Turbo/ }).f
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { get: () => 8, configurable: true }); // sem regra de hardware
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), 120); // ~8 fps
   });
@@ -79,6 +80,7 @@ async function turbo(page) { await page.getByRole('button', { name: /Turbo/ }).f
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
   const page = await ctx.newPage();
   await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { get: () => 8, configurable: true });
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => setTimeout(() => raf(cb), 120);
     if (!localStorage.getItem('altina-da-sorte:v2')) sessionStorage.setItem('first', '1');
@@ -102,6 +104,46 @@ async function turbo(page) { await page.getByRole('button', { name: /Turbo/ }).f
   }
   out.m7manual = res;
   await ctx.close();
+}
+{
+  // M7 (v3, 3.5.5): modo econômico automático por HARDWARE (núcleos <= 4 ou memória <= 2 GB); a escolha manual nunca é sobrescrita.
+  const cases = [
+    ['cores=4', { cores: 4 }, null],
+    ['cores=8', { cores: 8 }, null],
+    ['memoria=2GB', { cores: 8, mem: 2 }, null],
+    ['memoria=4GB', { cores: 8, mem: 4 }, null],
+    ['cores=2 + escolha manual (light=false)', { cores: 2 }, { light: false, lightManual: true }],
+    ['cores=2 + escolha manual (light=true)', { cores: 2 }, { light: true, lightManual: true }],
+  ];
+  out.m7hardware = [];
+  for (const [name, hw, manual] of cases) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+    const page = await ctx.newPage();
+    await page.addInitScript(({ hw, manual }) => {
+      Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', { get: () => hw.cores, configurable: true });
+      if (hw.mem) Object.defineProperty(Navigator.prototype, 'deviceMemory', { get: () => hw.mem, configurable: true });
+      if (manual && !localStorage.getItem('__seeded')) {
+        localStorage.setItem('__seeded', '1');
+        const s = JSON.parse(localStorage.getItem('altina-da-sorte:v2') || 'null');
+        if (!s) {
+          // sem save ainda: cria um mínimo via reload depois
+        }
+        sessionStorage.setItem('__manual', JSON.stringify(manual));
+      }
+    }, { hw, manual });
+    await page.goto(BASE + '/');
+    if (manual) {
+      await page.getByText('ENTRAR').click();
+      await sleep(400);
+      await page.evaluate((m) => { const s = JSON.parse(localStorage.getItem('altina-da-sorte:v2')); Object.assign(s.settings, m); localStorage.setItem('altina-da-sorte:v2', JSON.stringify(s)); }, manual);
+      await page.reload();
+    }
+    await page.getByText('ENTRAR').click();
+    await sleep(600);
+    const st = (await save(page)).settings;
+    out.m7hardware.push({ caso: name, light: st.light, lightManual: st.lightManual });
+    await ctx.close();
+  }
 }
 
 // ---------- (4) M10 ----------

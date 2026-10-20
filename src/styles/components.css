@@ -116,10 +116,12 @@
 .altina .tr-main, .altina .tr-extra, .altina .srow { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); grid-gap: 3px; gap: 3px; }
 .altina .tc {
   display: grid; place-items: center; width: 100%; max-width: var(--tcs, none); justify-self: center;
-  width: min(100%, var(--tcs, 100%)); aspect-ratio: 1;
+  aspect-ratio: 1;
   border-radius: 50%; font-style: normal; font-weight: 800; font-size: 20px; line-height: 1; letter-spacing: -.05em;
   font-variant-numeric: tabular-nums; color: #fff; background: #ffffff14; border: 2px solid transparent; overflow: hidden;
 }
+/* min() + var() juntos: sem min() (Chrome < 79) a declaracao viraria "invalida em tempo de calculo"; so entra com suporte */
+@supports (width: min(1px, 2px)) { .altina .tc { width: min(100%, var(--tcs, 100%)); } }
 .altina .tc.xs { border: 2px dashed var(--gold); background: transparent; }
 .altina .tc.on { border-color: transparent; }
 .altina .tc.xs.on { border: 2px dashed var(--gold); }
@@ -235,12 +237,16 @@
   position: relative; isolation: isolate; display: grid; place-items: center; min-width: 0; min-height: 0;
   font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
   font-size: var(--cellfs, 20px);
-  font-size: clamp(20px, calc(((100cqh - var(--gap)) / 2 - 62px) / 3 * .66), var(--cellfs));
   background: #fff; border: 2px solid #d8c88d; border-radius: 8px; color: var(--ink);
 }
+/* UM container (as cartelas) para o tamanho do numero; as 60 celulas NAO sao containers (cada container custava
+   ~2x no estilo/layout de uma marcacao em lote). O diametro do carimbo (--cd) vem de src/ui/cardView.ts (medido so em
+   resize/rotacao/mudanca de layout, nunca durante o sorteio); sem --cd cai em 94%. */
 .altina .cards { container-type: size; }
-.altina .cell { container-type: size; }
-.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; height: 94%; width: 94cqmin; height: 94cqmin; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
+.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; height: 94%; width: var(--cd, 94%); height: var(--cd, 94%); border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
+@supports (container-type: size) {
+  .altina .cell { font-size: clamp(20px, calc(((100cqh - var(--gap)) / 2 - 62px) / 3 * .66), var(--cellfs)); }
+}
 .altina .cell.mk { color: #fff; border-color: transparent; background: #fff4; }
 .altina .cell.mk::before { opacity: 1; transform: none; }
 .altina .cell.mk.nw::before { animation: stamp .15s ease-out; }
@@ -309,25 +315,31 @@
 .altina .gift-ic { display: grid; place-items: center; }
 .altina .gift-ic svg { width: 96px; height: 96px; display: block; }
 .altina .dlg-body .gift-ic, .altina .dlg-body h2, .altina .dlg-body .bigprize { flex: none; }
-.altina .bigprize { font-size: calc(56px * var(--ts)); font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1.12; font-variant-numeric: tabular-nums; }
+.altina .bigprize { font-size: calc(56px * var(--ts));  font-weight: 900; color: var(--gold); text-align: center; line-height: 1.12; font-variant-numeric: tabular-nums; }
 .altina .celeb { position: relative; text-align: center; }
 .altina .celeb .big {
-  font-size: calc(72px * var(--ts)); font-size: min(calc(72px * var(--ts)), 15vw); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
+  font-size: calc(72px * var(--ts));  font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
   animation: bump .7s ease-out both; letter-spacing: .02em;
 }
-.altina .celeb .big.sm { font-size: calc(44px * var(--ts)); font-size: min(calc(44px * var(--ts)), 11vw); }
+.altina .celeb .big.sm { font-size: calc(44px * var(--ts)); }
+@supports (width: min(1px, 2px)) {
+  .altina .bigprize { font-size: min(calc(56px * var(--ts)), 12vw); }
+  .altina .celeb .big { font-size: min(calc(72px * var(--ts)), 15vw); }
+  .altina .celeb .big.sm { font-size: min(calc(44px * var(--ts)), 11vw); }
+}
 .altina .celeb .sub { font-size: var(--fs-xl); font-weight: 800; }
-.altina .confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 49; pointer-events: none; overflow: hidden; }
+.altina .confetti { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 49; pointer-events: none; overflow: hidden; contain: strict; }
 .altina .confetti i {
   position: absolute; left: 0; top: 0; width: 14px; height: 22px; border-radius: 3px; opacity: 0;
   background: var(--k, #ffd24a);
-  animation: fall var(--dur, 3.5s) linear var(--dl, 0s) infinite;
+  animation: fall var(--dur, 2s) linear var(--dl, 0s) 1 both;
 }
 .altina .confetti i.cl { width: 36px; height: 36px; background: none; }
 .altina .confetti i.cl svg { width: 100%; height: 100%; }
 @keyframes fall {
   0% { transform: translate3d(calc(var(--x) * 1vw), -12vh, 0) rotate(0deg); opacity: 1; }
-  100% { transform: translate3d(calc(var(--x) * 1vw + var(--dx) * 1vw), 108vh, 0) rotate(var(--rot, 540deg)); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(calc(var(--x) * 1vw + var(--dx) * 1vw), 108vh, 0) rotate(var(--rot, 540deg)); opacity: 0; }
 }
 @keyframes bump { 0% { transform: scale(.3); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
 
@@ -806,3 +818,7 @@
 @media (orientation: portrait) and (max-width: 380px) {
   .altina .falta { letter-spacing: -.07em; padding: 0; }
 }
+
+/* ================= v3 desempenho: isola layout/pintura das regioes que mudam durante o sorteio ================= */
+/* (cartelas, trilho, tabela de premios, faixa do celular) — uma marcacao/bola nova nao invalida o resto da pagina */
+.altina .card, .altina .trail, .altina .ptab, .altina .strip { contain: layout paint; }

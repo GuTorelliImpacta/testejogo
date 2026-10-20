@@ -1,7 +1,9 @@
+import './polyfills';
 import { bus } from './events';
 import { createGame, handleResetPinParam } from './game';
 import { createAudio } from './audio';
 import { mountUI, setSpokenCaption } from './ui';
+import { lowEndReason, lowFps, perfCollector, refreshSwVersion } from './perf';
 
 const root = document.getElementById('app')!;
 const audio = createAudio(bus);
@@ -24,6 +26,7 @@ function syncEconomy(): void {
   const light = game.getView().settings.light;
   if (light !== lastLight) {
     lastLight = light;
+    perfCollector.setEconomy(light);
     audio.setEconomy(light);
   }
 }
@@ -50,26 +53,19 @@ document.addEventListener('visibilitychange', () => {
 });
 addEventListener('pointerdown', () => void keepAwake(), { once: true });
 
-// Modo leve automático: só depois de 3 rodadas, medindo o FPS durante o sorteio.
-// Nunca sobrescreve a escolha manual (o jogo ignora `lightManual:false` se já houver escolha).
-function watchFps(): void {
-  let frames = 0;
-  let start = 0;
-  function tick(t: number): void {
-    if (!start) start = t;
-    frames++;
-    if (t - start >= 3000) {
-      const fps = (frames * 1000) / (t - start);
-      if (fps < 24 && !game.getView().settings.light) game.updateSettings({ light: true, lightManual: false });
-      return;
-    }
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
+// Coletor de FPS / pior quadro: rAF só durante o sorteio (aba "Aparelho" do painel e modo econômico automático).
+perfCollector.attach(bus);
+
+// Modo econômico automático (SPEC 3.5.5): liga sozinho em aparelho fraco (deviceMemory <= 2 GB, <= 4 núcleos)
+// ou com FPS baixo nas primeiras rodadas (3 rodadas medidas). `lightManual:false` nunca sobrescreve a escolha manual:
+// o jogo ignora o pedido se a pessoa já escolheu (ligar ou desligar o Modo leve em Ajustes).
+function autoEconomy(): void {
+  const s = game.getView().settings;
+  if (!s.light && !s.lightManual) game.updateSettings({ light: true, lightManual: false });
 }
-let rounds = 0;
-bus.on('roundStart', () => {
-  if (++rounds === 4) watchFps();
+if (lowEndReason()) autoEconomy();
+perfCollector.onRound((rounds) => {
+  if (lowFps(rounds)) autoEconomy();
 });
 // prefers-reduced-motion só sugere o padrão na primeira abertura.
 try {
@@ -82,5 +78,13 @@ try {
 }
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  addEventListener('load', () => void navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then(refreshSwVersion)
+      .catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', refreshSwVersion);
+    refreshSwVersion();
+  });
 }

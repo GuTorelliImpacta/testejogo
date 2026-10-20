@@ -1,10 +1,13 @@
 // Efeitos sonoros sintetizados (zero download). Todos curtos, originais e suaves.
 import type { AudioEngine } from './engine';
+import { canPrerender, newOffline, renderCompat } from './compat';
 import { Voices, midiHz, noiseHit, tone } from './synth';
 
 export class Sfx {
   private voices: Voices | null = null;
   private lastCtx: BaseAudioContext | null = null;
+  /** "Globo girando" pré-renderizado (1 fonte em vez de ~26 nós por bola); 'pend'/'fail' = não usar ainda. */
+  private ballBuf = new WeakMap<BaseAudioContext, AudioBuffer | 'pend' | 'fail'>();
 
   constructor(private engine: AudioEngine) {}
 
@@ -36,6 +39,40 @@ export class Sfx {
     const e = this.env();
     if (!e) return;
     const { v, d, t } = e;
+    const ctx = v.ctx;
+    const cached = this.ballBuf.get(ctx);
+    if (cached && cached !== 'pend' && cached !== 'fail') {
+      // mesmo som, 1 fonte + 1 ganho: cada nó criado custa na thread principal (tablet fraco)
+      const src = ctx.createBufferSource();
+      src.buffer = cached;
+      src.connect(d);
+      v.run(src, t, cached.duration, []);
+      return;
+    }
+    if (!cached && canPrerender()) this.prerenderBall(ctx);
+    this.buildBallDraw(v, d, t);
+  }
+
+  /** Renderiza uma vez, em tempo ocioso, o mesmo grafo de `buildBallDraw` num OfflineAudioContext. */
+  private prerenderBall(ctx: BaseAudioContext): void {
+    this.ballBuf.set(ctx, 'pend');
+    const go = () => {
+      try {
+        const sr = ctx.sampleRate;
+        const off = newOffline(1, Math.ceil(0.5 * sr), sr);
+        this.buildBallDraw(new Voices(off, true), off.destination, 0);
+        renderCompat(off).then(
+          (b) => this.ballBuf.set(ctx, b),
+          () => this.ballBuf.set(ctx, 'fail'),
+        );
+      } catch {
+        this.ballBuf.set(ctx, 'fail');
+      }
+    };
+    setTimeout(go, 400);
+  }
+
+  private buildBallDraw(v: Voices, d: AudioNode, t: number): void {
     noiseHit(v, d, { t, dur: 0.24, gain: 0.05, filter: 'bandpass', freq: 520, q: 1.2, attack: 0.05 });
     noiseHit(v, d, { t: t + 0.06, dur: 0.2, gain: 0.035, filter: 'bandpass', freq: 1150, q: 1.5, attack: 0.05 });
     let at = t + 0.01;

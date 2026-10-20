@@ -15,11 +15,6 @@
   grid-gap: var(--gap);
   gap: var(--gap);
   padding: var(--pad);
-  /* iPhone com entalhe: respeita as areas seguras (aparelho sem env() ignora estas linhas) */
-  padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px));
-  padding-right: calc(var(--pad) + env(safe-area-inset-right, 0px));
-  padding-bottom: calc(var(--pad) + env(safe-area-inset-bottom, 0px));
-  padding-left: calc(var(--pad) + env(safe-area-inset-left, 0px));
   font-family: var(--font);
   font-size: var(--fs);
   line-height: 1.15;
@@ -42,6 +37,17 @@
 .altina .cards   { grid-area: cards; }
 .altina .bar     { grid-area: bar; }
 .altina .capslot { display: none; }
+
+/* iPhone com entalhe: respeita as areas seguras. Em @supports porque `calc(var() + env())` num navegador sem env()
+   (Chrome < 69) vira "invalido em tempo de calculo" e zeraria o padding em vez de manter o valor-reserva. */
+@supports (padding: env(safe-area-inset-top)) {
+  .altina {
+    padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px));
+    padding-right: calc(var(--pad) + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(var(--pad) + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(var(--pad) + env(safe-area-inset-left, 0px));
+  }
+}
 
 /* ---------- paisagem (tablet principal) ---------- */
 .altina {
