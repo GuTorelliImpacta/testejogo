@@ -6,7 +6,8 @@
  *
  * Definições (explícitas):
  *   apostas        = soma das apostas das cartelas (aposta x cartelas ativas) de todas as rodadas;
- *   extras pagas   = soma do custo das bolas extras NÃO grátis;
+ *   extras pagas   = soma do custo das bolas extras NÃO grátis, em rodadas que NÃO terminaram em bingo
+ *                    (o custo das extras de uma rodada de bingo é do bingo, não do prêmio comum);
  *   prêmios comuns = prêmios por cartela (Linha, Linha dupla...), exceto Bingo e Acumulado;
  *   RTP comuns     = prêmios comuns / (apostas + extras pagas)   <- meta ~0,88;
  *   oferta         = cada vez que o jogo oferece a próxima bola extra; grátis = oferta com plan.free;
@@ -53,7 +54,8 @@ interface Run {
   bets: number;
   common: number;
   bingoPrize: number; // Bingo (cartela) + Acumulado
-  extraPaid: number;
+  extraPaid: number; // extras pagas em rodadas SEM bingo (entram no RTP dos prêmios comuns)
+  extraPaidBingo: number; // extras pagas em rodadas que terminaram em bingo (custo do bingo)
   offersRounds: number; // rodadas com pelo menos uma oferta
   offers: number; // ofertas (cada bola extra oferecida)
   freeOffers: number;
@@ -81,7 +83,7 @@ function runOne(rpd: number, seed: number, bet: number): Run {
   let credits = START_CREDITS;
   let jackpot = JACKPOT_BASE;
   const run: Run = {
-    bet, rounds: 0, bets: 0, common: 0, bingoPrize: 0, extraPaid: 0, offersRounds: 0, offers: 0, freeOffers: 0,
+    bet, rounds: 0, bets: 0, common: 0, bingoPrize: 0, extraPaid: 0, extraPaidBingo: 0, offersRounds: 0, offers: 0, freeOffers: 0,
     roundsWithBingo: 0, perCard: {}, perRoundBest: {}, roundsWithLinha: 0, roundsWithDupla: 0, noPrize: 0,
     recargas: 0, minCredits: credits, finalCredits: credits, weekly: [], bingoTimes: [], months: {},
     jackpotsPaid: 0, jackpotSum: 0, bingoMain: 0, bingoExtra: 0,
@@ -114,7 +116,6 @@ function runOne(rpd: number, seed: number, bet: number): Run {
       credits += sum.prize;
       run.rounds++;
       run.bets += totalBet;
-      run.extraPaid += sum.extraCost;
       let hadBingo = false;
       let common = 0;
       let linha = false;
@@ -128,6 +129,8 @@ function runOne(rpd: number, seed: number, bet: number): Run {
       }
       if (linha) run.roundsWithLinha++;
       if (dupla) run.roundsWithDupla++;
+      if (hadBingo) run.extraPaidBingo += sum.extraCost;
+      else run.extraPaid += sum.extraCost;
       run.common += common;
       run.bingoPrize += sum.prize - common;
       if (sum.best) run.perRoundBest[sum.best] = (run.perRoundBest[sum.best] ?? 0) + 1;
@@ -253,7 +256,7 @@ for (const rpd of PROFILES) {
   console.log(`  [${recOk ? 'OK ' : 'FORA'}] recargas de presente em ${DAYS} dias: média ${f(recMean, 1)}, máx ${Math.max(...rec)}${rpd >= 120 ? ' (meta <= ~20)' : ''}`);
 
   console.log(`  RTP comuns / apostas (sem somar extras): ${f(common / bets, 3)} | RTP total (comuns + bingo + acumulado) / (apostas + extras): ${f((common + bingo) / (bets + extra), 3)}`);
-  console.log(`  extras: ${f(sum((r) => r.offers) / rounds, 2)} ofertas/rodada; custo pago médio ${f(extra / rounds, 2)} por rodada (apostas ${BET * NCARDS}); grátis ${sum((r) => r.freeOffers)} de ${sum((r) => r.offers)}`);
+  console.log(`  extras: ${f(sum((r) => r.offers) / rounds, 2)} ofertas/rodada; custo pago médio ${f(extra / rounds, 2)} por rodada (+ ${f(sum((r) => r.extraPaidBingo) / runs.length, 0)} por seed em rodadas de bingo) (apostas ${BET * NCARDS}); grátis ${sum((r) => r.freeOffers)} de ${sum((r) => r.offers)}`);
   console.log(`  acumulado pago por seed: ${f(sum((r) => r.jackpotsPaid) / runs.length)} vezes, média ${f(sum((r) => r.jackpotSum) / Math.max(1, sum((r) => r.jackpotsPaid)), 0)} créditos (parcela da aposta ${BET}: ${jackpotShare(BET) * 100}%)`);
 
   // padrões
@@ -283,7 +286,7 @@ if (!argStr('nopartial', '')) {
     const paid = sum((r) => r.jackpotsPaid);
     console.log(
       `  aposta ${b} (parcela ${jackpotShare(b) * 100}%): bingos/seed ${f(sum((r) => r.roundsWithBingo) / runs.length)}, ` +
-      `acumulado pago ${f(paid / runs.length)}x/seed (parcial em ${paid ? '100' : '0'}% dos pagamentos), média ${f(sum((r) => r.jackpotSum) / Math.max(1, paid), 0)} créditos; ` +
+      `acumulado pago ${f(paid / runs.length)}x/seed (parcial em ${paid ? '100' : '0'}% dos pagamentos; ${f((1000 * paid) / rounds, 1)} por 1000 rodadas), média ${f(sum((r) => r.jackpotSum) / Math.max(1, paid), 0)} créditos; ` +
       `${pct(paid / Math.max(1, sum((r) => r.roundsWithBingo)))} dos bingos foram na principal; ` +
       `RTP comuns ${f(common / (bets + extra), 3)}; sem prêmio ${pct(sum((r) => r.noPrize) / rounds)}; recargas/seed ${f(sum((r) => r.recargas) / runs.length, 1)}`,
     );

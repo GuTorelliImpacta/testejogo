@@ -4,15 +4,19 @@ import '../styles/layout.css';
 import '../styles/components.css';
 import type { GameApi, GameView } from '../gameApi';
 import { bus } from '../events';
-import { T, } from '../texts';
-import { PLAYER } from '../config';
+import { T } from '../texts';
+import { BALLS_MAIN } from '../types';
 import { btn, fmt, h, setCls, setText } from './dom';
 import { createCaptions } from './captions';
 import { createCards } from './cardView';
 import { createBalls } from './ballView';
 import { createControls, makeLogo } from './controls';
 import { createModals } from './modals';
+import { createPrizeTable } from './prizeView';
+import { createExtraPanel } from './extraPanel';
 import { U } from './uitext';
+
+export { setSpokenCaption } from './captions';
 
 export interface UIHandle {
   render(): void;
@@ -41,26 +45,35 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
   };
 
   const captions = createCaptions();
-  const cap = h('div', 'cap');
-  cap.append(captions.el);
-
-  const cards = createCards((i) => {
-    if (lastView?.phase === 'idle') api.toggleCard(i);
-  });
+  const cards = createCards();
   const balls = createBalls();
+  const prizes = createPrizeTable(() => modals.open('prizes'));
+  const xpanel = createExtraPanel(api);
   const controls = createControls({
     play: () => api.play(),
-    accelerate: () => api.accelerate(),
-    swap: () => api.swapCards(),
-    prizes: () => modals.open('prizes'),
+    numbers: () => {
+      api.shuffleCards();
+      controls.shuffleAnim();
+      if (!isLight()) cards.shuffle();
+    },
+    turbo: (on) => api.setTurbo(on),
     settings: () => modals.open('settings'),
     sound: () => api.updateSettings({ muted: !lastView?.settings.muted }),
-    auto: () => api.setAuto(!lastView?.auto),
     bet: (d) => api.changeBet(d),
+    cards: (d) => api.changeCards(d),
+    mail: () => api.openMail(),
     logoTap,
   });
 
   const modals = createModals(api, () => render());
+
+  // legenda: no celular fica numa faixa propria (ao lado de som/ajustes); no tablet, junto da bola
+  const capSlot = h('div', 'capslot');
+  balls.capHost.append(captions.el);
+  const phoneMq = window.matchMedia('(orientation: portrait) and (max-width: 599px)');
+  const placeCaption = () => (phoneMq.matches ? capSlot : balls.capHost).append(captions.el);
+  phoneMq.addEventListener?.('change', placeCaption);
+  placeCaption();
 
   // ---- splash ----
   const splash = h('div', 'splash');
@@ -71,11 +84,13 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
 
   root.append(
     controls.top,
-    cap,
+    capSlot,
+    balls.ballsec,
+    xpanel.el,
+    balls.strip,
+    balls.trail,
+    prizes.el,
     cards.el,
-    balls.ballbox,
-    balls.hist,
-    balls.recent,
     controls.bar,
     liveBall,
     livePrize,
@@ -90,7 +105,6 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
   let lastCredits = -1;
   let creditShown = 0;
   let creditRaf = 0;
-  let lastPhase = '';
 
   const isLight = () => root.classList.contains('light');
 
@@ -117,6 +131,28 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
     creditRaf = requestAnimationFrame(step);
   }
 
+  /** Texto de estado padrao da legenda (quando nao ha fala nem aviso visual). */
+  function stateText(v: GameView): string {
+    switch (v.phase) {
+      case 'idle':
+        return v.summary && v.drawn.length > 0 ? (v.summary.prize > 0 ? U.stateWon(v.summary.prize) : U.stateDone) : U.stateIdle;
+      case 'drawing':
+      case 'extraDrawing':
+        return U.stateDrawing;
+      case 'extraOffer':
+        return U.stateExtra;
+      case 'settling':
+        return U.stateSettling;
+      default:
+        return '';
+    }
+  }
+
+  function counterText(v: GameView): string {
+    if (v.extrasDrawn > 0) return U.extraOf(v.extrasDrawn, v.extraTotal);
+    return U.ballOf(Math.min(v.mainCount, BALLS_MAIN), BALLS_MAIN);
+  }
+
   function render(): void {
     const v = api.getView();
     lastView = v;
@@ -131,74 +167,74 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
       lastTextSize = ts;
     }
     captions.setEnabled(s.captions);
+    captions.setState(stateText(v));
 
     const inGame = v.phase !== 'splash';
     setCls(splash, 'hide', inGame);
     modals.sync(v, { giftKind, light: s.light });
+
+    const offerOn = xpanel.update(v);
+    setCls(root, 'x-on', offerOn);
+    setCls(root, 'has-mail', !!v.mail && !v.mail.open && v.phase === 'idle');
 
     const drawing = v.phase === 'drawing' || v.phase === 'extraDrawing' || v.phase === 'extraOffer';
     cards.update({
       cards: v.cards,
       active: v.active,
       drawn: v.drawn,
-      interactive: v.phase === 'idle',
       showAlmost: drawing || v.phase === 'settling' || v.phase === 'celebrating',
+      prizeTable: v.prizeTable,
+      offer: v.phase === 'extraOffer' ? v.extraOffer : null,
     });
-    balls.update(v.drawn, v.current, v.mainCount);
-    controls.update(v, true);
+    balls.update({ drawn: v.drawn, current: v.current, counter: counterText(v) });
+    prizes.update(v);
+    controls.update(v);
 
     if (v.credits !== lastCredits) {
       showCredits(v.credits);
       lastCredits = v.credits;
     }
-    lastPhase = v.phase;
   }
 
   // ------------------------------------------------ eventos pontuais
+  // A legenda NAO e derivada destes eventos: ela mostra a fala que tocou (setSpokenCaption).
   const on = bus.on.bind(bus);
   unsubs.push(
     on('roundStart', () => {
-      captions.show(T.luck, 2, 1800);
+      cards.resetWon();
       setText(liveBall, '');
     }),
-    on('ballDrawn', ({ ball, extra, fast }) => {
+    on('ballDrawn', ({ ball }) => {
       if (!isLight()) balls.pop();
-      if (!fast) captions.show(extra ? `${U.extraRound} ${T.ballCaption(ball)}` : T.ballCaption(ball), 1, 1600);
-      setText(liveBall, `${T.ballCaption(ball)}`);
+      setText(liveBall, T.ballCaption(ball));
     }),
-    on('almost', ({ cardIndex, forBingo }) => {
+    on('almost', ({ cardIndex }) => {
       if (!isLight()) cards.flash(cardIndex);
-      const t = forBingo ? U.almostBingo : U.almostOne;
-      captions.show(t, 3, 2200);
-      setText(livePrize, `${U.card(cardIndex + 1)}: ${t}`);
+      captions.flash(T.almost, 2200); // aviso visual, nao falado
+      setText(livePrize, `${U.card(cardIndex + 1)}: ${U.almostOne}`);
     }),
     on('patternWon', ({ cardIndex, pattern, prize }) => {
+      cards.setWon(cardIndex, pattern, prize);
+      render();
       if (!isLight()) cards.popSeal(cardIndex);
-      captions.show(`${T.patternShout[pattern]}`, 4, 2400);
+      prizes.flash(pattern);
       setText(livePrize, `${U.card(cardIndex + 1)}: ${T.patternNames[pattern]}, ${prize} créditos`);
     }),
-    on('extraOffer', () => captions.show(T.extraOffer, 3, 3000)),
-    on('extraBought', () => captions.show(U.extraBought, 3, 2000)),
     on('roundEnd', ({ summary, won }) => {
-      const t = won ? `${T.won} +${fmt(summary.prize)}` : T.nextTime;
-      captions.show(t, 2, 3000);
       setText(livePrize, won ? U.wonPrize(summary.prize) : T.nextTime);
     }),
     on('bingo', () => {
-      captions.show(`${T.bingoBig} ${T.congrats}`, 5, 4000);
       setText(livePrize, `${T.bingoBig} ${T.congrats}`);
     }),
     on('jackpot', ({ amount }) => {
-      captions.show(T.jackpotWon, 5, 4000);
+      prizes.flash('jackpot');
       setText(livePrize, `${T.jackpotWon} ${fmt(amount)}`);
     }),
     on('giftCredits', () => {
       giftKind = 'gift';
-      captions.show(T.giftTitle, 3, 3000);
     }),
     on('dailyBonus', () => {
       giftKind = 'daily';
-      captions.show(T.dailyTitle, 3, 3000);
     }),
   );
 
@@ -211,10 +247,9 @@ export function mountUI(root: HTMLElement, api: GameApi): UIHandle {
       cancelAnimationFrame(creditRaf);
       captions.destroy();
       modals.destroy();
+      phoneMq.removeEventListener?.('change', placeCaption);
       root.textContent = '';
-      root.classList.remove('altina', 'light', 'ts-normal', 'ts-grande', 'ts-muito');
-      void lastPhase;
-      void PLAYER;
+      root.classList.remove('altina', 'light', 'x-on', 'has-mail', 'ts-normal', 'ts-grande', 'ts-muito');
     },
   };
 }

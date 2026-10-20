@@ -1,7 +1,6 @@
 // Modais: premios, ajustes, oferta de bola extra, presente, celebracao, PIN e painel admin.
 import type { GameApi, GameView } from '../gameApi';
 import type { PatternId, RoundSummary, Settings } from '../types';
-import { PATTERN_ORDER } from '../types';
 import { MULTIPLIER } from '../config';
 import { MASKS } from '../patterns';
 import { T } from '../texts';
@@ -10,12 +9,25 @@ import { U } from './uitext';
 
 export type Local = 'prizes' | 'settings' | 'pin' | 'admin' | null;
 
-function layer(cls = '', label = ''): { layer: HTMLElement; dlg: HTMLElement } {
+interface Layer {
+  layer: HTMLElement;
+  dlg: HTMLElement;
+  head: HTMLElement;
+  body: HTMLElement;
+  foot: HTMLElement;
+}
+
+/** Dialogo com cabecalho e rodape fixos; so o miolo (`body`) poderia rolar (nunca precisa). */
+function layer(cls = '', label = ''): Layer {
   const l = h('div', 'layer hide ' + cls);
   const d = h('div', 'dlg', undefined, { role: 'dialog', 'aria-modal': 'true' });
   if (label) d.setAttribute('aria-label', label);
+  const head = h('div', 'dlg-head');
+  const body = h('div', 'dlg-body');
+  const foot = h('div', 'dlg-foot');
+  d.append(head, body, foot);
   l.append(d);
-  return { layer: l, dlg: d };
+  return { layer: l, dlg: d, head, body, foot };
 }
 
 function focusFirst(root: HTMLElement): void {
@@ -39,47 +51,72 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   let local: Local = null;
   let rafId = 0;
   const cleanups: (() => void)[] = [];
+  let lastView: GameView | null = null;
 
   const setLocal = (l: Local) => {
     local = l;
     onLocalChange();
   };
+  const closeBtn = (fn: () => void = () => setLocal(null)) => btn('green', U.close, fn, 300);
 
-  // ------------------------------------------------ premios
+  // ------------------------------------------------ premios (com desenhos)
   const P = layer('', T.prizes);
-  P.dlg.append(h('h2', '', U.prizesTitle));
+  P.head.append(h('h2', '', U.prizesTitle));
   const pSub = h('p');
+  P.head.append(pSub);
   const ptable = h('div', 'ptable');
-  const pRows: { name: HTMLElement; val: HTMLElement; pat: PatternId }[] = [];
-  for (const pat of [...PATTERN_ORDER].reverse()) {
-    const row = h('div', 'prow');
-    const mini = h('div', 'mini');
-    const mask = MASKS[pat][0];
-    for (let k = 0; k < 15; k++) mini.append(h('i', (mask >> k) & 1 ? 'x' : ''));
-    const pn = h('div', 'pn');
-    const nm = h('span', '', T.patternNames[pat]);
-    pn.append(nm);
-    const sm = h('small', '', `×${MULTIPLIER[pat]}` + (MASKS[pat].length > 1 && pat !== 'bingo' ? ` (${U.any})` : ''));
-    pn.append(sm);
-    const pv = h('div', 'pv');
-    row.append(mini, pn, pv);
-    ptable.append(row);
-    pRows.push({ name: nm, val: pv, pat });
-  }
   const jk = h('div', 'prow jk');
   const jkT = h('div', 'pn', T.jackpot);
-  jkT.append(h('small', '', U.jackpotRule));
+  const jkRule = h('small', '', U.jackpotRule);
+  jkT.append(jkRule);
   const jkV = h('div', 'pv');
   jk.append(jkT, jkV);
-  const pClose = btn('green', U.close, () => setLocal(null), 300);
-  P.dlg.append(pSub, ptable, jk, pClose);
+  P.body.append(ptable, jk);
+  P.foot.append(closeBtn());
+  let pSig = '';
+  const pRows = new Map<string, HTMLElement>();
+  const buildPrizes = (v: GameView) => {
+    ptable.textContent = '';
+    pRows.clear();
+    for (const { pattern: pat } of [...v.prizeTable].reverse()) {
+      const row = h('div', 'prow');
+      const mini = h('div', 'mini');
+      const mask = MASKS[pat][0];
+      for (let k = 0; k < 15; k++) mini.append(h('i', (mask >> k) & 1 ? 'x' : ''));
+      const pn = h('div', 'pn');
+      pn.append(h('span', '', T.patternNames[pat]));
+      pn.append(h('small', '', `×${MULTIPLIER[pat]}` + (MASKS[pat].length > 1 && pat !== 'bingo' ? ` (${U.any})` : '')));
+      const pv = h('div', 'pv');
+      row.append(mini, pn, pv);
+      ptable.append(row);
+      pRows.set(pat, pv);
+    }
+  };
 
-  // ------------------------------------------------ ajustes
+  // ------------------------------------------------ ajustes (3 abas, sem rolagem)
   const S = layer('', T.settings);
-  S.dlg.append(h('h2', '', T.settings));
-  const sgrid = h('div', 'sgrid');
+  S.head.append(h('h2', '', T.settings));
+  const tabsEl = h('div', 'tabs', undefined, { role: 'tablist' });
+  const panes: Record<string, HTMLElement> = { som: h('div', 'pane'), jogo: h('div', 'pane'), tela: h('div', 'pane') };
+  const tabBtns: Record<string, HTMLButtonElement> = {};
+  let tab = 'som';
+  const showTab = (t: string) => {
+    tab = t;
+    for (const k in panes) {
+      setCls(panes[k], 'hide', k !== t);
+      tabBtns[k].setAttribute('aria-pressed', k === t ? 'true' : 'false');
+    }
+  };
+  for (const [k, label] of [['som', U.tabSound], ['jogo', U.tabGame], ['tela', U.tabScreen]] as const) {
+    tabBtns[k] = btn('tab', label, () => showTab(k), 150);
+    tabBtns[k].setAttribute('role', 'tab');
+    tabsEl.append(tabBtns[k]);
+    S.body.append(panes[k]);
+  }
+  S.head.append(tabsEl);
+
   const segBtns: Record<string, HTMLButtonElement[]> = {};
-  const mkSeg = (title: string, key: keyof Settings, opts: [string, unknown][]) => {
+  const mkSeg = (pane: HTMLElement, title: string, key: keyof Settings, opts: [string, unknown][]) => {
     const box = h('div', 'sset');
     box.append(h('h3', '', title));
     const seg = h('div', 'seg');
@@ -90,33 +127,23 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
       return b;
     });
     box.append(seg);
-    sgrid.append(box);
+    pane.append(box);
   };
-  mkSeg(U.speed, 'speed', [
-    [U.slow, 'lenta'],
-    [U.normal, 'normal'],
-    [U.fast, 'rapida'],
-  ]);
-  mkSeg(U.captions, 'captions', [
-    [U.on, true],
-    [U.offs, false],
-  ]);
-  mkSeg(U.light, 'light', [
-    [U.lightOn, true],
-    [U.lightOff, false],
-  ]);
-  mkSeg(U.textSize, 'textSize', [
-    [U.sizeNormal, 'normal'],
-    [U.sizeBig, 'grande'],
-    [U.sizeHuge, 'muito'],
-  ]);
-  const volBox = h('div', 'sset');
-  volBox.append(h('h3', '', U.volumes));
+  /** Liga/desliga com um unico botao grande ao lado do nome. */
+  const toggles: { b: HTMLButtonElement; get: (v: GameView) => boolean; on: string; off: string }[] = [];
+  const mkToggle = (pane: HTMLElement, title: string, get: (v: GameView) => boolean, set: (on: boolean) => void, on: string, off: string) => {
+    const row = h('div', 'trow');
+    row.append(h('h3', '', title));
+    const b = btn('tg', off, () => set(!get(lastView!)), 200);
+    row.append(b);
+    pane.append(row);
+    toggles.push({ b, get, on, off });
+  };
   const meters: { key: 'volMusic' | 'volVoice' | 'volSfx'; pips: HTMLElement[] }[] = [];
   const mkVol = (label: string, key: 'volMusic' | 'volVoice' | 'volSfx') => {
     const row = h('div', 'vol');
     const step = (d: number) => {
-      const cur = lastSettings?.[key] ?? 0.5;
+      const cur = lastView?.settings[key] ?? 0.5;
       const nv = Math.min(1, Math.max(0, Math.round((cur + d) * 10) / 10));
       api.updateSettings({ [key]: nv } as Partial<Settings>);
     };
@@ -132,26 +159,21 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
       meter.append(pip);
     }
     row.append(h('span', 'lab', label), m, meter, p);
-    volBox.append(row);
+    panes.som.append(row);
     meters.push({ key, pips });
   };
   mkVol(U.music, 'volMusic');
   mkVol(U.voice, 'volVoice');
   mkVol(U.effects, 'volSfx');
-  sgrid.append(volBox);
-  S.dlg.append(sgrid, btn('green', U.close, () => setLocal(null), 300));
-  let lastSettings: Settings | null = null;
-
-  // ------------------------------------------------ oferta de bola extra
-  const X = layer('soft sheet', T.extraOffer);
-  X.dlg.classList.add('extra');
-  const xTitle = h('h2', '', T.extraOffer);
-  const xRem = h('div', 'xrem');
-  const xBuy = btn('big gold', '', () => api.buyExtra());
-  const xEnd = btn('big', T.finish, () => api.finishExtra());
-  const xrow = h('div', 'xrow');
-  xrow.append(xBuy, xEnd);
-  X.dlg.append(xTitle, xrow, xRem);
+  mkSeg(panes.jogo, U.speed, 'speed', [[U.slow, 'lenta'], [U.normal, 'normal'], [U.fast, 'rapida']]);
+  mkToggle(panes.jogo, U.turboSet, (v) => v.turbo, (on) => api.setTurbo(on), U.turboOn, U.turboOff);
+  mkToggle(panes.jogo, U.autoSet, (v) => v.auto, (on) => api.setAuto(on), U.turboOn, U.turboOff);
+  mkToggle(panes.jogo, U.bordoes, (v) => v.settings.bordoes, (on) => api.updateSettings({ bordoes: on }), U.turboOn, U.turboOff);
+  mkSeg(panes.tela, U.textSize, 'textSize', [[U.sizeNormal, 'normal'], [U.sizeBig, 'grande'], [U.sizeHuge, 'muito']]);
+  mkToggle(panes.tela, U.captions, (v) => v.settings.captions, (on) => api.updateSettings({ captions: on }), U.on, U.offs);
+  mkToggle(panes.tela, U.light, (v) => v.settings.light, (on) => api.updateSettings({ light: on, lightManual: true }), U.lightOn, U.lightOff);
+  S.foot.append(closeBtn());
+  showTab('som');
 
   // ------------------------------------------------ presente
   const G = layer('', T.giftTitle);
@@ -159,13 +181,23 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   gIc.innerHTML = cloverSvg();
   const gTitle = h('h2', '', T.giftTitle);
   const gBody = h('div', 'bigprize');
-  const gBtn = btn('big green', T.take, () => api.takeGift());
-  G.dlg.append(gIc, gTitle, gBody, gBtn);
+  G.body.append(gIc, gTitle, gBody);
+  G.foot.append(btn('big green', T.take, () => api.takeGift()));
+
+  // ------------------------------------------------ correio da sorte (tela grande)
+  const M = layer('mailay', U.mailTitle);
+  const mIc = h('div', 'gift-ic');
+  mIc.innerHTML = cloverSvg();
+  const mTitle = h('h2', '', `🍀 ${U.mailTitle}`);
+  const mBody = h('div', 'bigprize');
+  M.body.append(mIc, mTitle, mBody);
+  M.foot.append(btn('big green', T.take, () => api.claimMail(), 500));
 
   // ------------------------------------------------ celebracao
   const C = layer('', T.congrats);
   let celebOn = false;
   let confetti: HTMLElement | null = null;
+  let contBtn: HTMLButtonElement | null = null;
 
   const countUp = (el: HTMLElement, to: number, ms: number, prefix = '+') => {
     cancelAnimationFrame(rafId);
@@ -197,21 +229,22 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   }
 
   function showCelebration(s: RoundSummary, light: boolean): void {
-    C.dlg.textContent = '';
+    C.body.textContent = '';
+    C.foot.textContent = '';
     if (confetti) confetti.remove();
     confetti = null;
     const best = s.best;
     const isBingo = best === 'bingo';
     const jack = s.jackpot > 0;
     const wrap = h('div', 'celeb stack');
-    const big = h('div', 'big' + (isBingo ? '' : ' sm'), isBingo ? T.bingoBig : best ? T.patternShout[best] : T.won);
-    wrap.append(big);
+    wrap.append(h('div', 'big' + (isBingo ? '' : ' sm'), isBingo ? T.bingoBig : best ? T.patternShout[best] : T.won));
     if (jack) wrap.append(h('div', 'sub', T.jackpotWon));
     wrap.append(h('div', 'sub', T.congrats));
     const prize = h('div', 'bigprize', '+0');
     wrap.append(prize);
-    const cont = btn('big green', T.continue, () => api.continueCelebration());
-    C.dlg.append(wrap, cont);
+    C.body.append(wrap);
+    contBtn = btn('big green', T.continue, () => api.continueCelebration());
+    C.foot.append(contBtn);
     C.dlg.setAttribute('aria-label', T.congrats);
     if (!light) {
       confetti = makeConfetti(isBingo || jack ? 36 : 16);
@@ -224,10 +257,10 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   // ------------------------------------------------ PIN e admin
   const N = layer('', U.pinTitle);
   let pin = '';
-  const nTitle = h('h2', '', U.pinTitle);
+  N.head.append(h('h2', '', U.pinTitle));
   const nDots = h('div', 'dots');
   const dotEls = [0, 1, 2, 3].map(() => nDots.appendChild(h('i')));
-  const nMsg = h('p', '', '');
+  const nMsg = h('p', 'pinmsg', '');
   const keys = h('div', 'keys');
   const refreshDots = () => dotEls.forEach((d, i) => setCls(d, 'on', i < pin.length));
   const addKey = (k: string) => {
@@ -247,23 +280,20 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   };
   for (const k of ['1', '2', '3', '4', '5', '6', '7', '8', '9']) keys.append(btn('', k, () => addKey(k), 80));
   keys.append(
+    h('span'),
+    btn('', '0', () => addKey('0'), 80),
     btn('', U.del, () => {
       pin = pin.slice(0, -1);
       refreshDots();
     }, 80),
-    btn('', '0', () => addKey('0'), 80),
-    btn('', U.close, () => {
-      pin = '';
-      refreshDots();
-      setLocal(null);
-    }, 300),
   );
-  N.dlg.append(nTitle, nDots, nMsg, keys);
+  N.body.append(nDots, nMsg, keys);
+  N.foot.append(closeBtn(() => { pin = ''; refreshDots(); setLocal(null); }));
 
   const A = layer('', U.adminTitle);
   A.dlg.classList.add('adm');
   const aSnap = h('pre');
-  const aText = h('textarea', '', undefined, { rows: '4', 'aria-label': 'JSON', spellcheck: 'false', placeholder: 'JSON' });
+  const aText = h('textarea', '', undefined, { rows: '3', 'aria-label': 'JSON', spellcheck: 'false', placeholder: 'JSON' });
   const aMsg = h('div', 'msg');
   let pend: string | null = null;
   const refreshAdmin = () => {
@@ -310,9 +340,11 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   aRow1.append(bExp, bImp);
   const aRow2 = h('div', 'row');
   aRow2.append(bJ, bC);
-  A.dlg.append(h('h2', '', U.adminTitle), aSnap, aText, aMsg, aRow1, aRow2, btn('green', U.close, () => { pend = null; setLocal(null); }, 300));
+  A.head.append(h('h2', '', U.adminTitle));
+  A.body.append(aSnap, aText, aMsg, aRow1, aRow2);
+  A.foot.append(closeBtn(() => { pend = null; setLocal(null); }));
 
-  const all = [P, S, X, G, C, N, A];
+  const all = [P, S, G, M, C, N, A];
 
   // Esc fecha modais locais
   const onKey = (ev: KeyboardEvent) => {
@@ -322,8 +354,8 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
   cleanups.push(() => document.removeEventListener('keydown', onKey));
 
   let shownLocal: Local = null;
-  let lastExtraKey = '';
   let lastGiftKey = '';
+  let lastMailKey = '';
 
   return {
     layers: all.map((x) => x.layer),
@@ -334,10 +366,11 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
         refreshDots();
         setText(nMsg, '');
       }
+      if (l === 'settings') showTab(tab);
       setLocal(l);
     },
     sync(v, opts) {
-      lastSettings = v.settings;
+      lastView = v;
       // ---- locais
       const showP = local === 'prizes';
       const showS = local === 'settings';
@@ -353,17 +386,30 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
         if (local) focusDlg(map[local].dlg);
       }
       if (showP) {
+        const sig = v.prizeTable.map((p) => p.pattern).join(',');
+        if (sig !== pSig) {
+          pSig = sig;
+          buildPrizes(v);
+        }
         setText(pSub, U.prizesFor(v.bet));
-        for (const r of pRows) setText(r.val, fmt(v.bet * MULTIPLIER[r.pat]));
-        setText(jkV, fmt(v.jackpot));
+        for (const { pattern, prize } of v.prizeTable) {
+          const el = pRows.get(pattern);
+          if (el) setText(el, fmt(prize));
+        }
+        setText(jkV, fmt(v.jackpot * v.jackpotShare));
+        setText(jkRule, U.jackpotRuleShare(v.jackpotShare));
       }
       if (showS) {
         for (const key in segBtns)
           for (const b of segBtns[key]) {
             const cur = String((v.settings as unknown as Record<string, unknown>)[key]);
-            const on = b.dataset.val === cur;
-            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            b.setAttribute('aria-pressed', b.dataset.val === cur ? 'true' : 'false');
           }
+        for (const t of toggles) {
+          const on = t.get(v);
+          setText(t.b, on ? t.on : t.off);
+          t.b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
         for (const m of meters) {
           const n = Math.round(v.settings[m.key] * 10);
           m.pips.forEach((p, i) => setCls(p, 'on', i < n));
@@ -371,18 +417,6 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
       }
 
       // ---- por fase
-      const ex = v.phase === 'extraOffer' && v.extraOffer;
-      setCls(X.layer, 'hide', !ex);
-      if (ex) {
-        const k = `${ex.cost}|${ex.remaining}`;
-        if (k !== lastExtraKey) {
-          lastExtraKey = k;
-          setText(xBuy, T.extraBall(ex.cost));
-          setText(xRem, U.remaining(ex.remaining));
-          focusFirst(X.dlg);
-        }
-      } else lastExtraKey = '';
-
       const gift = v.phase === 'gift';
       setCls(G.layer, 'hide', !gift);
       if (gift) {
@@ -394,6 +428,18 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
           focusFirst(G.dlg);
         }
       } else lastGiftKey = '';
+
+      // correio: so em 'idle' (nunca durante sorteio nem sobre a oferta de extra)
+      const mail = !!v.mail && v.mail.open && v.phase === 'idle';
+      setCls(M.layer, 'hide', !mail);
+      if (mail && v.mail) {
+        const k = `${v.mail.amount}`;
+        if (k !== lastMailKey) {
+          lastMailKey = k;
+          setText(mBody, U.mailAmount(v.mail.amount));
+          focusFirst(M.dlg);
+        }
+      } else lastMailKey = '';
 
       const cel = v.phase === 'celebrating' && !!v.summary;
       setCls(C.layer, 'hide', !cel);
@@ -410,6 +456,7 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
     destroy() {
       cancelAnimationFrame(rafId);
       cleanups.forEach((f) => f());
+      void contBtn;
     },
   };
 }

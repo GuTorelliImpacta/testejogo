@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { seededRng } from '../src/rng';
 import { generateCards } from '../src/cards';
 import { playRound } from '../src/round';
-import { TUNING } from '../src/config';
+import { TUNING, setPatternSet, activePatterns } from '../src/config';
+import type { PatternSetName } from '../src/config';
 import type { DirectorState } from '../src/types';
 import {
   DAY_MS,
@@ -12,6 +13,8 @@ import {
   initialDirector,
   monthKey,
   planRound,
+  rollFree,
+  DIRECTOR_PARAMS,
 } from '../src/director';
 
 const ACTIVE = [true, true, true, true];
@@ -162,3 +165,101 @@ describe('Diretor: simulação de 150 dias', () => {
     }
   });
 });
+
+describe('Diretor: bola extra grátis (plan.free)', () => {
+  it('rollFree: uma flag por extra e ~17,5% verdadeiras', () => {
+    const rng = seededRng(7);
+    const f = rollFree(20000, rng);
+    expect(f).toHaveLength(20000);
+    const share = f.filter(Boolean).length / f.length;
+    expect(share).toBeGreaterThan(0.15);
+    expect(share).toBeLessThan(0.2);
+    expect(DIRECTOR_PARAMS.chanceGratis).toBeGreaterThanOrEqual(0.15);
+    expect(DIRECTOR_PARAMS.chanceGratis).toBeLessThanOrEqual(0.2);
+  });
+
+  it('planRound devolve plan.free com o mesmo tamanho das extras; grátis não custa e não muda o resultado', () => {
+    const d = state({ ultimoBingoEm: T0 - 2 * DAY_MS, rodadasDesdeUltimoBingo: 50 });
+    let offers = 0;
+    let free = 0;
+    for (let seed = 1; seed <= 600; seed++) {
+      const rng = seededRng(seed);
+      const cards = generateCards(rng);
+      const { plan } = planRound({ cards, active: ACTIVE, bet: 5, now: T0, director: d, rng });
+      expect(plan.free).toBeDefined();
+      expect(plan.free!).toHaveLength(plan.extras.length);
+      expect(plan.extras.length).toBeLessThanOrEqual(9);
+      const withFlags = playRound(cards, ACTIVE, 5, 5000, plan, true).summary;
+      const noFlags = playRound(cards, ACTIVE, 5, 5000, { ...plan, free: undefined }, true).summary;
+      expect(withFlags.results.map((r) => r.pattern)).toEqual(noFlags.results.map((r) => r.pattern));
+      expect(withFlags.extraCost).toBeLessThanOrEqual(noFlags.extraCost);
+      expect(withFlags.extrasUsed).toBe(noFlags.extrasUsed);
+      offers += withFlags.extrasUsed;
+      free += withFlags.freeExtras;
+    }
+    expect(offers).toBeGreaterThan(100);
+    expect(free / offers).toBeGreaterThan(0.1);
+    expect(free / offers).toBeLessThan(0.26);
+  });
+});
+
+for (const SET of ['classico', 'variado'] as PatternSetName[]) {
+  describe(`Diretor: conjunto ${SET}`, () => {
+    beforeAll(() => setPatternSet(SET));
+    afterAll(() => setPatternSet('classico'));
+
+    it('alvo por cartela só usa padrões do conjunto ativo; resultado real respeita o plano', () => {
+      const act = new Set(activePatterns());
+      const d = state({ ultimoBingoEm: T0 - 2 * DAY_MS, rodadasDesdeUltimoBingo: 50 }); // bingo proibido
+      let comPremio = 0;
+      for (let seed = 1; seed <= 300; seed++) {
+        const rng = seededRng(5000 + seed);
+        const cards = generateCards(rng);
+        const { plan } = planRound({ cards, active: ACTIVE, bet: 5, now: T0, director: d, rng });
+        const { summary } = playRound(cards, ACTIVE, 5, 5000, plan, true);
+        for (const r of summary.results) {
+          if (r.pattern) {
+            comPremio++;
+            expect(act.has(r.pattern)).toBe(true);
+            expect(r.pattern).not.toBe('bingo');
+          }
+        }
+      }
+      expect(comPremio).toBeGreaterThan(30);
+    });
+
+    it('bingo forçado (após 16 dias) sai com a intenção do Diretor e dentro de 90 bolas', () => {
+      const d = state({ ultimoBingoEm: T0 - 20 * DAY_MS, rodadasDesdeUltimoBingo: 20 * 30 });
+      let bingos = 0;
+      for (let seed = 1; seed <= 60; seed++) {
+        const rng = seededRng(9000 + seed);
+        const cards = generateCards(rng);
+        const { plan, intendedBingo } = planRound({ cards, active: ACTIVE, bet: 5, now: T0, director: d, rng });
+        for (const n of [...plan.main, ...plan.extras]) {
+          expect(n).toBeGreaterThanOrEqual(1);
+          expect(n).toBeLessThanOrEqual(90);
+        }
+        const { summary } = playRound(cards, ACTIVE, 5, 5000, plan, true);
+        const had = summary.results.some((r) => r.pattern === 'bingo');
+        expect(had).toBe(intendedBingo);
+        if (had) bingos++;
+      }
+      expect(bingos).toBeGreaterThan(40);
+    });
+
+    it('sorteio das rodadas comuns: frequências na faixa (sem prêmio 50-68%)', () => {
+      const d = state({ ultimoBingoEm: T0 - 2 * DAY_MS, rodadasDesdeUltimoBingo: 50 });
+      let none = 0;
+      const N = 500;
+      for (let seed = 1; seed <= N; seed++) {
+        const rng = seededRng(12000 + seed);
+        const cards = generateCards(rng);
+        const { plan } = planRound({ cards, active: ACTIVE, bet: 5, now: T0, director: d, rng });
+        const { summary } = playRound(cards, ACTIVE, 5, 5000, plan, true);
+        if (!summary.best) none++;
+      }
+      expect(none / N).toBeGreaterThan(0.5);
+      expect(none / N).toBeLessThan(0.68);
+    }, 60_000);
+  });
+}

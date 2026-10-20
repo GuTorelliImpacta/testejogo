@@ -1,8 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClipPlayer, SpeechHandle } from '../src/audio/engine';
-import { Narrator } from '../src/audio/narrator';
+import { Narrator, maxSpeechMs } from '../src/audio/narrator';
+import { createAudio } from '../src/audio';
+import { AudioEngine } from '../src/audio/engine';
+import { Bus } from '../src/events';
 import type { SynthSpeaker } from '../src/audio/narrator';
-import { LINE_BY_ID, VOICE_LINES, numberId, numberWord, prizeIds, PRIORITY } from '../src/audio/script';
+import {
+  BORDOES,
+  LINE_BY_ID,
+  VOICE_LINES,
+  bordaoId,
+  numberId,
+  numberWord,
+  pickNumberLine,
+  prizeIds,
+  PRIORITY,
+} from '../src/audio/script';
 import { PATTERN_ORDER } from '../src/types';
 
 /** Motor falso: cada play() cria uma fala que só termina quando o teste manda. */
@@ -42,13 +55,40 @@ const flush = async () => {
 };
 
 describe('roteiro', () => {
-  it('tem números 1..60 por extenso e variações de prêmio', () => {
-    for (let n = 1; n <= 60; n++) expect(LINE_BY_ID.has(numberId(n))).toBe(true);
+  it('tem números 1..90 por extenso e variações de prêmio', () => {
+    for (let n = 1; n <= 90; n++) expect(LINE_BY_ID.has(numberId(n))).toBe(true);
+    expect(VOICE_LINES.filter((l) => l.category === 'number')).toHaveLength(90);
     expect(LINE_BY_ID.get('n01')!.text).toBe('Um!');
-    expect(LINE_BY_ID.get('n60')!.text).toBe('Sessenta!');
+    expect(LINE_BY_ID.get('n90')!.text).toBe('Noventa!');
     expect(numberWord(47)).toBe('Quarenta e sete');
+    expect(numberWord(71)).toBe('Setenta e um');
+    expect(numberWord(88)).toBe('Oitenta e oito');
     for (const p of PATTERN_ORDER) expect(prizeIds(p).length).toBeGreaterThanOrEqual(2);
     expect(new Set(VOICE_LINES.map((l) => l.id)).size).toBe(VOICE_LINES.length);
+  });
+  it('tem as falas novas e bordões com número', () => {
+    expect(LINE_BY_ID.get('extra_free')!.text).toBe('Bola extra grátis!');
+    expect(LINE_BY_ID.get('mail_1')!.text).toBe('Correio da sorte!');
+    expect(LINE_BY_ID.get('turbo_1')!.text).toBe('Turbo!');
+    expect(LINE_BY_ID.get('extra_linhadupla')!.text).toBe('Linha dupla, valendo!');
+    expect(BORDOES[22]).toMatch(/patinhos na lagoa/i);
+    for (const n of Object.keys(BORDOES).map(Number)) {
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(90);
+      expect(LINE_BY_ID.get(bordaoId(n))!.category).toBe('bordao');
+    }
+  });
+  it('pickNumberLine: bordão só com setting ligado, número com bordão e ~1/8 de chance', () => {
+    expect(pickNumberLine(22, true, () => 0.01)).toBe('bordao_22');
+    expect(pickNumberLine(22, true, () => 0.5)).toBe('n22');
+    expect(pickNumberLine(22, false, () => 0.01)).toBe('n22');
+    expect(pickNumberLine(5, true, () => 0.01)).toBe('n05'); // sem bordão cadastrado
+    let hits = 0;
+    let seed = 7;
+    const r = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    for (let i = 0; i < 4000; i++) if (pickNumberLine(22, true, r) === 'bordao_22') hits++;
+    expect(hits / 4000).toBeGreaterThan(0.09);
+    expect(hits / 4000).toBeLessThan(0.16);
   });
   it('bingo tem prioridade máxima', () => {
     expect(LINE_BY_ID.get('prize_bingo_1')!.priority).toBe(PRIORITY.bingo);
@@ -268,5 +308,144 @@ describe('Narrator', () => {
     await Promise.all([a, b]);
     expect(nar.pending).toBe(0);
     expect(clips.stopped).toEqual(['n01']);
+  });
+});
+
+describe('Narrator: modo acelerado, legenda e rede de segurança', () => {
+  it('Turbo/acelerado também cala o bordão', async () => {
+    const clips = new FakeClips();
+    const n = new Narrator({ clips });
+    n.setFast(true);
+    await n.say('bordao_22');
+    expect(clips.started).toEqual([]);
+  });
+
+  it('legenda = texto do clipe; com voz sintetizada = texto enviado ao sintetizador; vazia ao terminar', async () => {
+    const clips = new FakeClips();
+    clips.available = new Set(['prize_linha_1']);
+    const captions: string[] = [];
+    const synth: SynthSpeaker = { speak: () => ({ done: Promise.resolve(), stop() {} }) };
+    const spoken: string[] = [];
+    const n = new Narrator({
+      clips,
+      synth: { speak: (t, st) => (spoken.push(t), synth.speak(t, st)) },
+      onCaption: (t) => captions.push(t),
+    });
+    void n.say('prize_linha_1');
+    clips.finish('prize_linha_1');
+    await flush();
+    await n.say('prize_linha_2'); // sem clipe → sintetizador
+    await n.say('bordao_22');
+    await n.say('prize_bingo_1'); // speak diferente do texto
+    await flush();
+    expect(captions.filter(Boolean)).toEqual(['Linhaaa!', 'Linha! Muito bem!', BORDOES[22], 'Bingo!']);
+    expect(spoken).toEqual(['Linha! Muito bem!', BORDOES[22], 'Bingo!']);
+    expect(captions[captions.length - 1]).toBe('');
+  });
+
+  it('M12: fala que nunca termina é encerrada pela rede de segurança', async () => {
+    vi.useFakeTimers();
+    const clips = new FakeClips();
+    const n = new Narrator({ clips });
+    let done = false;
+    void n.say('n10').then(() => (done = true));
+    void n.say('n11');
+    vi.advanceTimersByTime(maxSpeechMs('Dez!') + 10);
+    await flush();
+    expect(done).toBe(true);
+    expect(clips.stopped).toEqual(['n10']);
+    expect(clips.started).toEqual(['n10', 'n11']); // a fila segue
+    vi.useRealTimers();
+  });
+});
+
+describe('createAudio: eventos novos', () => {
+  const setup = (rnd = () => 0.99) => {
+    vi.useFakeTimers();
+    const bus = new Bus();
+    const audio = createAudio(bus, { engine: new AudioEngine({ fetchFn: undefined }), rnd });
+    const caps: string[] = [];
+    audio.onCaption((c) => caps.push(c));
+    const spoken = () => caps.filter(Boolean);
+    return { bus, audio, spoken };
+  };
+  afterEach(() => vi.useRealTimers());
+
+  it('bola extra grátis é falada uma vez, mesmo com freeExtra + extraOffer.free', () => {
+    const { bus, spoken, audio } = setup();
+    bus.emit('extraOffer', { cost: 0, free: true, remaining: 9, improves: [] });
+    bus.emit('freeExtra');
+    expect(spoken()).toEqual(['Bola extra grátis!']);
+    audio.dispose();
+  });
+
+  it('oferta por linha dupla fala "Linha dupla, valendo!"; oferta comum mantém a fala antiga', () => {
+    const a = setup();
+    a.bus.emit('extraOffer', { cost: 5, free: false, remaining: 9, improves: [{ cardIndex: 0, pattern: 'linhaDupla', gain: 9 }] });
+    expect(a.spoken()).toEqual(['Linha dupla, valendo!']);
+    a.audio.dispose();
+    const b = setup();
+    b.bus.emit('extraOffer', { cost: 5, free: false, remaining: 9, improves: [{ cardIndex: 0, pattern: 'bingo', gain: 9 }] });
+    expect(b.spoken()).toEqual(['Bola extra! Vai, Dona Altina!']);
+    b.audio.dispose();
+  });
+
+  it('correio e Turbo', () => {
+    const { bus, spoken, audio } = setup();
+    bus.emit('mailbox', { kind: 'daily', amount: 300, state: 'arrived' });
+    vi.advanceTimersByTime(5000);
+    bus.emit('turboChanged', { on: true });
+    vi.advanceTimersByTime(5000);
+    bus.emit('turboChanged', { on: false });
+    expect(spoken()).toEqual(['Correio da sorte!', 'Turbo!']);
+    audio.dispose();
+  });
+
+  it('Turbo liga o modo acelerado: bola sem voz; bordão só com setBordoes(true) e sorte', async () => {
+    const { bus, spoken, audio } = setup(() => 0);
+    bus.emit('turboChanged', { on: true });
+    await vi.advanceTimersByTimeAsync(5000);
+    bus.emit('ballDrawn', { ball: 22, index: 0, total: 30, extra: false, fast: true });
+    expect(spoken()).toEqual(['Turbo!']);
+    bus.emit('turboChanged', { on: false });
+    audio.setBordoes(false);
+    bus.emit('ballDrawn', { ball: 22, index: 1, total: 30, extra: false, fast: false });
+    expect(spoken().pop()).toBe('Vinte e dois!');
+    await vi.advanceTimersByTimeAsync(5000);
+    audio.setBordoes(true);
+    bus.emit('ballDrawn', { ball: 22, index: 2, total: 30, extra: false, fast: false });
+    expect(spoken().pop()).toBe(BORDOES[22]);
+    audio.dispose();
+  });
+});
+
+describe('AudioEngine: M4 (sem requisições de clipes inexistentes)', () => {
+  const resp = (ok: boolean, body = '{}') =>
+    ({ ok, headers: { get: () => 'application/json' }, json: async () => JSON.parse(body), arrayBuffer: async () => new ArrayBuffer(200) }) as unknown as Response;
+  const settle = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve();
+  };
+
+  it('sem manifest: só pede os 2 manifests, nenhum clipe', async () => {
+    const urls: string[] = [];
+    const e = new AudioEngine({ fetchFn: (async (u: string) => (urls.push(u), resp(false))) as unknown as typeof fetch });
+    e.preload(['n01', 'n02', 'prize_bingo_1']);
+    await settle();
+    expect(urls.sort()).toEqual(['/audio/voice-custom/manifest.json', '/audio/voice/manifest.json']);
+  });
+
+  it('manifest vazio: nenhum clipe; manifest com ids: só busca o listado', async () => {
+    const urls: string[] = [];
+    const f = (async (u: string) => {
+      urls.push(u);
+      if (u.endsWith('voice/manifest.json')) return resp(true, '{"ids":["n02"]}');
+      if (u.endsWith('voice-custom/manifest.json')) return resp(true, '{"ids":[]}');
+      return resp(true);
+    }) as unknown as typeof fetch;
+    const e = new AudioEngine({ fetchFn: f });
+    e.preload(['n01', 'n02']);
+    await settle();
+    expect(urls.filter((u) => !u.endsWith('manifest.json'))[0]).toMatch(/\/audio\/voice\/n02\.(webm|mp3)$/);
+    expect(urls.some((u) => /n01/.test(u))).toBe(false);
   });
 });

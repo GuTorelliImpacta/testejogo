@@ -1,10 +1,12 @@
 // Cartelas: DOM construido uma vez; marcar = troca de classe via Map<numero, celulas[]>.
-import type { Card } from '../types';
+import type { Card, PatternId } from '../types';
 import { markedMask } from '../cards';
-import { bestPattern, bestReachableByOne, missingCells } from '../patterns';
+import { isComplete, levelOf, missing, missingCells } from '../patterns';
 import { T } from '../texts';
-import { h, setAttr, setCls, setText, cloverSvg } from './dom';
+import { h, setAttr, setCls, setText } from './dom';
 import { U } from './uitext';
+
+type Offer = { improves: { cardIndex: number; pattern: PatternId; gain: number }[] } | null;
 
 interface CardUi {
   el: HTMLElement;
@@ -12,6 +14,8 @@ interface CardUi {
   seal: HTMLElement;
   sealTxt: HTMLElement;
   falta: HTMLElement;
+  faltaFull: HTMLElement;
+  faltaSh: HTMLElement;
   sig: string;
   mask: number;
   active: boolean;
@@ -25,14 +29,21 @@ export interface CardsView {
     cards: Card[];
     active: boolean[];
     drawn: number[];
-    interactive: boolean;
     showAlmost: boolean;
+    prizeTable: { pattern: PatternId; prize: number }[];
+    offer: Offer;
   }): void;
   flash(i: number): void;
   popSeal(i: number): void;
+  /** premio efetivamente pago (evento patternWon); ate o proximo reset usa-se a tabela */
+  setWon(i: number, pattern: PatternId, prize: number): void;
+  resetWon(): void;
+  /** animacao curta de embaralhar (so transform/opacity) */
+  shuffle(): void;
 }
 
-export function createCards(onToggle: (i: number) => void): CardsView {
+export function createCards(): CardsView {
+  const won = new Map<number, { pattern: PatternId; prize: number }>();
   const root = h('div', 'cards', undefined, { role: 'group', 'aria-label': 'Cartelas' });
   const ui: CardUi[] = [];
   /** numero -> celulas de TODAS as cartelas (uma entrada por cartela) */
@@ -41,16 +52,18 @@ export function createCards(onToggle: (i: number) => void): CardsView {
   let lastNew: HTMLElement[] = [];
 
   for (let i = 0; i < 4; i++) {
-    const el = h('div', `card k${i + 1}`, undefined, { role: 'button', tabindex: '0', 'aria-pressed': 'true' });
+    const el = h('div', `card k${i + 1}`, undefined, { role: 'group' });
     const head = h('div', 'card-head');
     const num = h('span', 'card-num', String(i + 1));
-    const seal = h('span', 'seal');
-    seal.insertAdjacentHTML('beforeend', cloverSvg());
-    const sealTxt = h('span');
+    const seal = h('div', 'seal');
+    const sealTxt = h('span', 'st');
     seal.append(sealTxt);
-    const falta = h('span', 'falta', T.almost);
+    const falta = h('span', 'falta');
+    const faltaFull = h('span', 'full', T.almost);
+    const faltaSh = h('span', 'short', T.almost);
+    falta.append(faltaFull, faltaSh);
     const offtag = h('span', 'offtag', U.off);
-    head.append(num, seal, falta, offtag);
+    head.append(num, falta, offtag);
     const grid = h('div', 'grid');
     const cells: HTMLElement[] = [];
     for (let k = 0; k < 15; k++) {
@@ -58,24 +71,9 @@ export function createCards(onToggle: (i: number) => void): CardsView {
       cells.push(c);
       grid.append(c);
     }
-    el.append(head, grid);
+    el.append(head, grid, seal);
     root.append(el);
-    let lastTap = -1e9;
-    const fire = () => {
-      if (el.classList.contains('lock')) return;
-      const now = performance.now();
-      if (now - lastTap < 250) return;
-      lastTap = now;
-      onToggle(i);
-    };
-    el.addEventListener('click', fire);
-    el.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' || ev.key === ' ') {
-        ev.preventDefault();
-        fire();
-      }
-    });
-    ui.push({ el, cells, seal, sealTxt, falta, sig: '', mask: 0, active: true, miss: 0, sealPat: '' });
+    ui.push({ el, cells, seal, sealTxt, falta, faltaFull, faltaSh, sig: '', mask: 0, active: true, miss: 0, sealPat: '' });
   }
 
   function rebuildCard(i: number, card: Card): void {
@@ -111,7 +109,13 @@ export function createCards(onToggle: (i: number) => void): CardsView {
 
   return {
     el: root,
-    update({ cards, active, drawn, interactive, showAlmost }) {
+    update({ cards, active, drawn, showAlmost, prizeTable, offer }) {
+      const pats = prizeTable.map((p) => p.pattern).sort((a, b) => levelOf(b) - levelOf(a));
+      const bestOf = (m: number): PatternId | null => pats.find((p) => isComplete(m, p)) ?? null;
+      const reachable = (m: number): PatternId | null => {
+        const cur = levelOf(bestOf(m));
+        return pats.find((p) => levelOf(p) > cur && missing(m, p) === 1) ?? null;
+      };
       let full = drawn.length < shown;
       cards.forEach((card, i) => {
         if (ui[i].sig !== card.nums.join(',')) {
@@ -157,31 +161,35 @@ export function createCards(onToggle: (i: number) => void): CardsView {
         u.active = active[i];
         const on = active[i];
         setCls(u.el, 'off', !on);
-        setCls(u.el, 'lock', !interactive);
-        setAttr(u.el, 'aria-pressed', on ? 'true' : 'false');
         setAttr(u.el, 'aria-label', `${U.card(i + 1)}${on ? '' : ', ' + U.off}`);
-        u.el.style.cursor = interactive ? 'pointer' : 'default';
 
-        const best = on ? bestPattern(u.mask) : null;
-        const sealKey = best ?? '';
+        const best = on ? bestOf(u.mask) : null;
+        const w = won.get(i);
+        const prize = best ? (w && w.pattern === best ? w.prize : (prizeTable.find((p) => p.pattern === best)?.prize ?? 0)) : 0;
+        const sealKey = best ? `${best}|${prize}` : '';
         if (u.sealPat !== sealKey) {
           u.sealPat = sealKey;
-          if (best) setText(u.sealTxt, T.patternNames[best]);
+          if (best) setText(u.sealTxt, U.sealPrize(T.patternNames[best], prize));
           setCls(u.seal, 'on', !!best);
         }
 
-        // FALTA 1!
+        // FALTA 1: com oferta de extra mostra o que ganha; fora dela, aviso curto
+        const imp = on && offer ? offer.improves.find((x) => x.cardIndex === i) : undefined;
+        let target: PatternId | null = null;
+        if (on && imp) target = imp.pattern;
+        else if (on && showAlmost) target = reachable(u.mask);
         let missMask = 0;
-        if (on && showAlmost) {
-          const nxt = bestReachableByOne(u.mask);
-          if (nxt) for (const k of missingCells(u.mask, nxt)) missMask |= 1 << k;
-        }
+        if (target) for (const k of missingCells(u.mask, target)) missMask |= 1 << k;
         if (missMask !== u.miss) {
           const diff = missMask ^ u.miss;
           for (let k = 0; k < 15; k++) if ((diff >> k) & 1) setCls(u.cells[k], 'miss', ((missMask >> k) & 1) === 1);
           u.miss = missMask;
-          setCls(u.falta, 'on', missMask !== 0);
-          setCls(u.el, 'has-falta', missMask !== 0);
+        }
+        setCls(u.falta, 'on', missMask !== 0);
+        setCls(u.el, 'has-falta', missMask !== 0);
+        if (missMask !== 0) {
+          setText(u.faltaFull, imp ? U.falta1(T.patternNames[imp.pattern], imp.gain) : T.almost);
+          setText(u.faltaSh, imp ? U.falta1Short(imp.gain) : T.almost);
         }
       });
     },
@@ -192,6 +200,26 @@ export function createCards(onToggle: (i: number) => void): CardsView {
       // reinicia animacao sem forcar layout: usa Web Animations quando existe
       if (el.animate) el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.035)' }, { transform: 'scale(1)' }], { duration: 450 });
       else el.classList.add('flash');
+    },
+    setWon(i, pattern, prize) {
+      won.set(i, { pattern, prize });
+    },
+    resetWon() {
+      won.clear();
+    },
+    shuffle() {
+      ui.forEach((u, i) => {
+        if (!u.el.animate) return;
+        const d = i % 2 ? 1 : -1;
+        u.el.animate(
+          [
+            { transform: 'none', opacity: 1 },
+            { transform: `translateX(${d * 28}px) rotate(${d * 3}deg) scale(.95)`, opacity: 0.3, offset: 0.45 },
+            { transform: 'none', opacity: 1 },
+          ],
+          { duration: 520, delay: i * 70, easing: 'ease-in-out' },
+        );
+      });
     },
     popSeal(i) {
       const el = ui[i]?.seal;

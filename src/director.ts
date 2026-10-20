@@ -33,7 +33,7 @@ export const DIRECTOR_PARAMS = {
   /** Fração das ofertas de bola extra que são GRÁTIS (plan.free). Meta: 15-20%. */
   chanceGratis: 0.175,
   /** Chance de outra cartela ativa também ganhar algo na rodada. */
-  chanceOutraCartela: 0.15,
+  chanceOutraCartela: 0.1,
   /** Rodada sem prêmio: chance de oferta de bola extra que não completa. */
   missSemPremio: 0.22,
   /** Rodada com prêmio: chance de o padrão sair na bola extra / de oferta que não completa. */

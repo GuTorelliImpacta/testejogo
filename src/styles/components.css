@@ -1,4 +1,4 @@
-/* Altina da Sorte - componentes. Animacoes: SOMENTE transform e opacity. */
+/* Altina da Sorte - componentes v2. Animacoes: SOMENTE transform e opacity. */
 .altina button { font-family: inherit; font-size: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
 .altina :focus-visible { outline: 4px solid var(--gold); outline-offset: 2px; }
 .altina .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -30,48 +30,62 @@
   box-shadow: 0 6px 0 #1a8a3e, 0 0 18px rgba(63, 209, 106, .55);
 }
 .altina .btn.play:disabled { box-shadow: none; }
-.altina .btn.big { min-height: 120px; font-size: calc(30px * var(--ts)); width: 100%; }
+.altina .btn.big { min-height: 96px; font-size: calc(30px * var(--ts)); width: 100%; }
 .altina .btn.gold { background: var(--gold); color: var(--ink); border-color: #fff; }
 .altina .btn.green { background: var(--play); color: var(--play-ink); border-color: var(--gold); }
-.altina .btn.icon { padding: 0; width: 72px; height: 72px; }
+.altina .btn.icon { padding: 0; width: 72px; height: 72px; flex: none; }
 .altina .btn.sq { width: var(--tap); flex: none; padding: 0; font-size: calc(36px * var(--ts)); }
 
 /* ---------- topo ---------- */
 .altina .logo {
   display: flex; align-items: center; gap: 6px; min-height: var(--tap); padding: 0 6px;
-  background: none; border: 0; text-align: left; flex: 0 1 auto;
-  font-weight: 900; font-size: calc(30px * var(--ts)); line-height: 1; color: var(--gold);
+  background: none; border: 0; text-align: left; flex: 0 1 auto; min-width: 0;
+  font-weight: 900; font-size: calc(28px * var(--ts)); line-height: 1; color: var(--gold);
   text-shadow: 0 2px 0 #000a;
   letter-spacing: -.01em;
 }
 .altina .logo svg { width: 1.2em; height: 1.2em; flex: none; }
-.altina .logo .lt { display: flex; flex-direction: column; }
+.altina .logo .lt { display: flex; flex-direction: column; min-width: 0; }
 .altina .logo .lt span:first-child { color: var(--gold-l); }
 .altina .stat {
   display: flex; flex-direction: column; justify-content: center; min-width: 0;
-  padding: 4px 14px; border-radius: var(--r); background: #0007; border: 2px solid #ffffff33;
-  min-height: 64px;
+  padding: 4px 12px; border-radius: var(--r); background: #0007; border: 2px solid #ffffff33;
+  min-height: 64px; flex: 1 1 0; max-width: 340px; overflow: hidden;
 }
-.altina .stat .lab { font-size: var(--fs); color: var(--txt-dim); font-weight: 700; line-height: 1.1; }
-.altina .stat .val { font-size: calc(34px * var(--ts)); font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--txt); }
+.altina .stat .lab { font-size: var(--fs); color: var(--txt-dim); font-weight: 700; line-height: 1.1; white-space: nowrap; }
+.altina .stat .val { font-size: calc(32px * var(--ts)); font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: var(--txt); white-space: nowrap; }
 .altina .stat.jack .val { color: var(--gold); }
-.altina .stat.cred { flex: 1 1 auto; max-width: 340px; }
-.altina .stat.jack { flex: 1 1 auto; max-width: 340px; }
-.altina .top .sp { flex: 1; }
+.altina .top .sp { flex: 1 1 0; min-width: 0; }
 .altina .top .stat.cred .val.up { color: #7dff9a; }
 
-/* ---------- legenda ---------- */
-.altina .cap { position: relative; }
-.altina .caption {
-  font-size: calc(26px * var(--ts)); font-weight: 900; line-height: 1.1; color: var(--gold-l);
-  text-shadow: 0 2px 0 #000b; opacity: 0; transform: translateY(8px);
-  transition: opacity .2s ease, transform .2s ease; padding: 0 4px; width: 100%;
-  overflow-wrap: anywhere;
+/* correio da sorte: carta balancando, com selo de trevo */
+.altina .mailb {
+  position: relative; flex: none; width: 76px; height: 76px; padding: 0;
+  border: 4px solid var(--gold); border-radius: 20px; background: var(--g700); color: var(--txt);
+  box-shadow: 0 0 0 3px #0006, 0 0 18px rgba(255, 210, 74, .6);
+  display: grid; place-items: center;
 }
-.altina .caption.on { opacity: 1; transform: none; }
-.altina .caption.hot { color: var(--yellow); }
+.altina .mailb svg { width: 50px; height: 50px; animation: wobble 1.4s ease-in-out infinite; transform-origin: 50% 80%; }
+.altina .mailb .clv { position: absolute; right: -10px; top: -12px; font-size: 28px; line-height: 1; animation: wobble 1.4s ease-in-out infinite; }
+.altina .mailb .ml { display: none; }
+@keyframes wobble { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
 
-/* ---------- bola ---------- */
+/* ---------- bola grande + contador + legenda ---------- */
+.altina .ballsec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--gap); align-items: center; min-width: 0; min-height: 0; }
+.altina .ballbox { display: grid; place-items: center; }
+.altina .binfo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.altina .counter { font-size: calc(32px * var(--ts)); font-weight: 900; line-height: 1.05; color: var(--gold); text-shadow: 0 2px 0 #000b; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.altina .caphost { min-width: 0; }
+.altina .caption {
+  font-size: calc(24px * var(--ts)); font-weight: 800; line-height: 1.1; color: var(--txt);
+  text-shadow: 0 2px 0 #000b; opacity: 0; transition: opacity .2s ease; padding: 0 2px; width: 100%;
+  overflow-wrap: anywhere; min-height: 1.1em;
+}
+.altina .caption.on { opacity: 1; }
+.altina .caption.spk { color: var(--gold-l); }
+.altina .caption.hot { color: var(--yellow); font-weight: 900; }
+
+/* bola */
 .altina .ballbox .ball { width: var(--ball); height: var(--ball); font-size: calc(var(--ball) * .46); }
 .altina .ball {
   position: relative; border-radius: 50%; display: grid; place-items: center;
@@ -80,9 +94,7 @@
   color: var(--ink); flex: none;
   box-shadow: 0 6px 14px #0008, inset 0 -6px 10px #0004;
 }
-.altina .ball::before { /* miolo branco */
-  content: ""; position: absolute; inset: 17%; border-radius: 50%; background: #fffdf3; box-shadow: inset 0 2px 5px #0003;
-}
+.altina .ball::before { content: ""; position: absolute; inset: 17%; border-radius: 50%; background: #fffdf3; box-shadow: inset 0 2px 5px #0003; }
 .altina .ball b { position: relative; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.03em; color: #111; }
 .altina .ball.empty { opacity: .35; }
 .altina .ball.r1 { --ba: var(--b1a); --bb: var(--b1b); }
@@ -95,45 +107,92 @@
   background: var(--gold); color: var(--ink); font-weight: 900; font-size: calc(var(--ball) * .22);
   display: grid; place-items: center; line-height: 1;
 }
-.altina .ballbox .ball.shine::after { /* brilho (removido no modo leve) */
-  content: ""; position: absolute; inset: 0; border-radius: 50%;
-  background: radial-gradient(circle at 28% 22%, #fff9 0, transparent 35%);
-}
+.altina .ballbox .ball.shine::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 28% 22%, #fff9 0, transparent 35%); }
 
-/* ---------- historico 1-60 ---------- */
-.altina .hist {
-  display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; align-content: start;
-  padding: 4px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22;
+/* ---------- trilho: 30 casas (3x10) + 9 casas de extra ---------- */
+.altina .trail { display: grid; gap: 8px; padding: 6px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22; min-width: 0; align-content: start; }
+.altina .tr-main, .altina .tr-extra, .altina .srow { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; }
+.altina .tc {
+  display: grid; place-items: center; width: min(100%, var(--tcs, 100%)); aspect-ratio: 1; justify-self: center;
+  border-radius: 50%; font-style: normal; font-weight: 800; font-size: 20px; line-height: 1; letter-spacing: -.05em;
+  font-variant-numeric: tabular-nums; color: #fff; background: #ffffff14; border: 2px solid transparent; overflow: hidden;
 }
-.altina .hist i {
-  font-style: normal; font-weight: 800; font-size: 20px; line-height: 1; letter-spacing: -.04em;
-  text-align: center; padding: 4px 0; border-radius: 6px; color: #8fb8a0; background: #ffffff0d;
-  font-variant-numeric: tabular-nums;
-}
-.altina .hist i.on { color: #fff; }
-.altina .hist i.on.r1 { background: var(--b1b); } .altina .hist i.on.r3 { background: var(--b3b); }
-.altina .hist i.on.r4 { background: var(--b4b); } .altina .hist i.on.r5 { background: var(--b5b); }
-.altina .hist i.on.r2 { background: var(--b2a); color: #1a1405; }
-.altina .hist i.on.x { outline: 2px dashed var(--gold); outline-offset: -2px; }
-.altina .hist i.last { background: var(--gold) !important; color: var(--ink) !important; transform: scale(1.12); }
-.altina .recent { align-items: center; gap: 6px; justify-content: space-between; }
-.altina .recent .ball { width: 44px; height: 44px; font-size: 20px; opacity: .92; }
-.altina .recent .ball:first-child { width: 76px; height: 76px; font-size: 34px; opacity: 1; }
-.altina .recent .ball::before { inset: 12%; }
-.altina .recent .sep { flex: 1; }
+.altina .tc.xs { border: 2px dashed var(--gold); background: transparent; }
+.altina .tc.on { border-color: transparent; }
+.altina .tc.xs.on { border: 2px dashed var(--gold); }
+.altina .tc.on.r1 { background: var(--b1b); } .altina .tc.on.r3 { background: var(--b3b); }
+.altina .tc.on.r4 { background: var(--b4b); } .altina .tc.on.r5 { background: var(--b5b); }
+.altina .tc.on.r2 { background: var(--b2a); color: var(--ink); }
+.altina .tc.last { box-shadow: 0 0 0 3px var(--gold), 0 0 10px var(--gold); transform: scale(1.08); position: relative; z-index: 1; }
+.altina .strip { gap: 6px; padding: 6px; border-radius: 12px; background: #0005; border: 2px solid #ffffff22; min-width: 0; }
+.altina .strip .counter { font-size: calc(28px * var(--ts)); text-align: center; }
+.altina .strip .tc { width: 100%; }
 
-/* ---------- barra de controles ---------- */
-.altina .bet-g { display: flex; gap: var(--gap); align-items: stretch; }
-.altina .bet-g .betbox {
-  flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center;
-  border-radius: var(--r); background: #0007; border: 2px solid #ffffff33; min-width: 0; padding: 0 6px;
+/* ---------- tabela de premios fixa (botao) ---------- */
+.altina .ptab {
+  display: flex; flex-direction: column; gap: 4px; min-width: 0; min-height: var(--tap); padding: 6px 8px;
+  border-radius: 14px; background: #0006; border: 2px solid #ffffff33; color: inherit; text-align: left;
+  align-self: stretch;
 }
-.altina .betbox .l1 { font-size: calc(20px * var(--tsb)); font-weight: 700; color: var(--txt-dim); white-space: nowrap; }
-.altina .betbox .l2 { font-size: calc(26px * var(--tsb)); font-weight: 900; color: var(--txt); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.altina .bar .btn.sec { font-size: calc(20px * var(--tsb)); flex-direction: column; gap: 2px; padding: 4px 6px; min-height: var(--tap); }
-.altina .bar .btn.sec svg { width: 26px; height: 26px; }
-@media (orientation: landscape) {
-  .altina .bar .btn.sec { flex-direction: row; }
+.altina .ptab .ph { font-size: var(--fs); font-weight: 900; color: var(--gold-l); line-height: 1.1; padding: 0 6px; }
+.altina .prows { display: grid; gap: 3px; align-content: space-evenly; flex: 1; min-height: 0; }
+.altina .ptab.many .prows { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+.altina .pr {
+  position: relative; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 3px 8px; border-radius: 8px; font-size: calc(24px * var(--ts)); font-weight: 800; line-height: 1.1; background: #ffffff0f;
+  min-width: 0; min-height: 36px;
+}
+.altina .pr .nm, .altina .pr .pv { position: relative; z-index: 1; white-space: nowrap; }
+.altina .pr .pv { color: var(--gold); font-weight: 900; font-variant-numeric: tabular-nums; }
+.altina .pr .short { display: none; }
+.altina .pr.jk .nm { color: var(--gold-l); }
+.altina .pr.win::after { content: ""; position: absolute; inset: 0; border-radius: 8px; background: var(--gold); animation: winp .45s ease-in-out infinite alternate; z-index: 0; }
+.altina .pr.win .nm, .altina .pr.win .pv { color: var(--ink); }
+@keyframes winp { from { opacity: .25; } to { opacity: 1; } }
+
+/* ---------- painel de bola extra (no lugar da bola; NAO e modal) ---------- */
+.altina .xpanel {
+  display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 10px; min-width: 0;
+  border-radius: 18px; border: 4px solid var(--yellow); background: rgba(0, 0, 0, .62);
+}
+.altina .xpanel.free { border-color: var(--gold); background: rgba(70, 48, 0, .7); }
+.altina .xtitle { font-size: calc(30px * var(--ts)); font-weight: 900; color: var(--yellow); text-align: center; line-height: 1.05; }
+.altina .xpanel.free .xtitle { color: var(--gold); }
+.altina .xrow { display: flex; gap: var(--gap); }
+.altina .xpanel .btn.big { flex: 1 1 0; min-width: 0; min-height: 88px; font-size: calc(28px * var(--ts)); width: auto; }
+.altina .xrem { display: none; font-size: var(--fs); text-align: center; color: var(--txt-dim); font-weight: 700; }
+@media (orientation: portrait) { .altina .xrem { display: block; } }
+@media (orientation: portrait) and (max-width: 599px) { .altina .xrem { display: none; } .altina .xpanel .btn.big { min-height: 80px; } }
+
+/* ---------- barra inferior ---------- */
+.altina .bar { align-items: center; }
+.altina .grp { display: flex; gap: var(--gap); align-items: stretch; min-width: 0; }
+.altina .sbox {
+  flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 96px;
+  border-radius: var(--r); background: #0007; border: 2px solid #ffffff33; padding: 0 6px;
+}
+.altina .sbox .l1 { font-size: 20px; font-weight: 700; color: var(--txt-dim); white-space: nowrap; line-height: 1.1; }
+.altina .sbox .l2 { font-size: calc(30px * var(--tsb)); font-weight: 900; color: var(--txt); white-space: nowrap; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.altina .bar .btn.sec { font-size: 20px; padding: 4px 8px; min-height: var(--tap); min-width: 100px; }
+.altina .g-turbo { gap: 8px; }
+.altina .g-turbo .ti svg { width: 30px; height: 30px; }
+.altina .g-turbo .tt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.05; }
+.altina .g-turbo .ta { font-weight: 900; }
+.altina .g-turbo .tb { font-weight: 700; font-size: 20px; }
+.altina .btn.g-play { flex-direction: column; gap: 2px; padding: 6px 10px; }
+.altina .g-play .ps { font-size: 20px; letter-spacing: 0; font-weight: 800; }
+@media (orientation: portrait) and (max-width: 599px) {
+  .altina .bar { gap: 12px; }
+  .altina .bar .btn.sec { min-width: 0; letter-spacing: -.03em; }
+  .altina .g-turbo .ti { display: none; }
+  .altina .g-turbo .tt { align-items: center; }
+  .altina .btn.g-play { min-height: 80px; font-size: calc(30px * var(--ts)); letter-spacing: .02em; }
+  .altina .grp { display: grid; grid-template-columns: 64px 64px; grid-template-areas: "box box" "mi pl"; justify-content: center; gap: 4px 12px; }
+  .altina .grp > .sq:first-child { grid-area: mi; }
+  .altina .grp > .sq:last-child { grid-area: pl; }
+  .altina .sbox { grid-area: box; flex-direction: row; gap: 8px; background: none; border: 0; min-width: 0; padding: 0; align-items: baseline; }
+  .altina .sbox .l1 { color: var(--txt); }
+  .altina .sbox .l2 { font-size: 24px; color: var(--gold); }
 }
 
 /* ---------- cartelas ---------- */
@@ -142,30 +201,30 @@
   position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0;
   background: var(--cream); color: var(--ink); border: 6px solid var(--cc); border-radius: 18px;
   padding: 4px 6px 6px; box-shadow: 0 0 0 2px #ffffff40, 0 6px 12px #0006;
-  transition: opacity .15s ease; text-align: left; font: inherit;
+  transition: opacity .15s ease; text-align: left; font: inherit; cursor: default;
 }
 .altina .card.k2 { --cc: var(--c2); } .altina .card.k3 { --cc: var(--c3); } .altina .card.k4 { --cc: var(--c4); }
 .altina .card.off { opacity: .42; }
-.altina .card.lock { cursor: default; }
 .altina .card-head { display: flex; align-items: center; gap: 6px; min-height: 36px; flex: none; }
 .altina .card-num {
   width: 34px; height: 34px; border-radius: 50%; background: var(--cc); color: #fff; font-weight: 900;
   font-size: 22px; display: grid; place-items: center; flex: none; line-height: 1;
 }
-.altina .seal {
-  display: none; align-items: center; gap: 4px; min-width: 0; padding: 1px 8px 1px 4px; border-radius: 99px;
-  background: var(--gold); color: var(--ink); font-weight: 900; font-size: calc(20px * var(--tsb)); line-height: 1.2;
-  border: 2px solid var(--gold-d); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+/* selo grande de premio sobre a cartela */
+.altina .seal { position: absolute; inset: 0; display: none; place-items: center; z-index: 4; pointer-events: none; padding: 6px; }
+.altina .seal.on { display: grid; }
+.altina .seal .st {
+  max-width: 94%; padding: 6px 16px; border-radius: 18px; background: var(--gold); color: var(--ink); text-align: center;
+  font-weight: 900; font-size: calc(30px * var(--tsb)); line-height: 1.05; border: 4px solid #fff; box-shadow: 0 6px 18px #000b, 0 0 0 3px var(--gold-d);
+  transform: rotate(-4deg);
 }
-.altina .seal > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.altina .seal svg { width: 22px; height: 22px; flex: none; }
-.altina .seal.on { display: inline-flex; }
 .altina .falta {
-  display: none; margin-left: auto; padding: 1px 10px; border-radius: 8px; background: var(--yellow); color: #000;
-  font-weight: 900; font-size: calc(20px * var(--tsb)); line-height: 1.25; white-space: nowrap; border: 2px solid #000;
+  display: none; flex: 1 1 0; min-width: 0; padding: 1px 8px; border-radius: 8px; background: var(--yellow); color: #000;
+  font-weight: 900; font-size: 20px; line-height: 1.1; border: 2px solid #000; text-align: center;
 }
-.altina .falta.on { display: inline-block; animation: pulse 0.9s ease-in-out infinite alternate; }
-.altina .offtag { display: none; margin-left: auto; font-weight: 800; font-size: calc(20px * var(--tsb)); color: #333; white-space: nowrap; }
+.altina .falta .short { display: none; }
+.altina .falta.on { display: block; animation: pulse 0.9s ease-in-out infinite alternate; }
+.altina .offtag { display: none; margin-left: auto; font-weight: 800; font-size: 20px; color: #333; white-space: nowrap; }
 .altina .card.off .offtag { display: inline; }
 .altina .grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, 1fr); grid-template-rows: repeat(3, 1fr); gap: 3px; }
 .altina .cell {
@@ -173,81 +232,76 @@
   font-weight: 900; font-size: var(--cellfs); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em;
   background: #fff; border: 2px solid #d8c88d; border-radius: 8px; color: var(--ink);
 }
-.altina .cell::before { /* carimbo */
-  content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; aspect-ratio: 1; border-radius: 50%; background: var(--cc);
-  opacity: 0; transform: scale(.4);
-}
+.altina .cell::before { content: ""; position: absolute; z-index: -1; place-self: center; width: 94%; aspect-ratio: 1; border-radius: 50%; background: var(--cc); opacity: 0; transform: scale(.4); }
 .altina .cell.mk { color: #fff; border-color: transparent; background: #fff4; }
 .altina .cell.mk::before { opacity: 1; transform: none; }
 .altina .cell.mk.nw::before { animation: stamp .15s ease-out; }
 .altina .cell.miss { background: #ffb300; border-color: #000; border-style: dashed; color: #000; }
-.altina .cell.miss::after { /* pulso */
-  content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 8px; background: var(--yellow);
-  animation: pulse .8s ease-in-out infinite alternate;
-}
+.altina .cell.miss::after { content: ""; position: absolute; inset: -2px; z-index: -1; border-radius: 8px; background: var(--yellow); animation: pulse .8s ease-in-out infinite alternate; }
 .altina .card.flash { animation: flash .5s ease-out; }
 @keyframes stamp { from { transform: scale(.4); opacity: .4; } to { transform: none; opacity: 1; } }
-@keyframes pulse { from { opacity: .35; } to { opacity: 1; } }
+@keyframes pulse { from { opacity: .45; } to { opacity: 1; } }
 @keyframes flash { 0% { transform: scale(1); } 40% { transform: scale(1.03); } 100% { transform: scale(1); } }
 
-/* ---------- modais ---------- */
+/* ---------- dialogos: cabecalho e rodape fixos, FECHAR sempre visivel ---------- */
 .altina .layer {
   position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 12px;
   background: rgba(2, 20, 12, .78);
 }
-.altina .layer.soft { background: rgba(2, 20, 12, .35); pointer-events: none; }
-.altina .layer.soft .dlg { pointer-events: auto; }
 .altina .dlg {
-  width: min(760px, 100%); max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 12px;
+  position: relative; z-index: 51; width: min(760px, 100%); max-height: 100%; overflow: hidden; display: flex; flex-direction: column; gap: 12px;
   background: linear-gradient(180deg, var(--g700), var(--g900)); border: 4px solid var(--gold); border-radius: 22px;
   padding: 16px; box-shadow: 0 10px 30px #000a;
 }
+.altina .dlg-head { flex: none; display: flex; flex-direction: column; gap: 10px; }
+.altina .dlg-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+.altina .dlg-foot { flex: none; display: flex; gap: 12px; }
+.altina .dlg-foot .btn { flex: 1; width: auto; }
+.altina .dlg-head:empty, .altina .dlg-foot:empty { display: none; }
 .altina .dlg h2 { margin: 0; font-size: calc(32px * var(--ts)); color: var(--gold); text-align: center; line-height: 1.1; }
 .altina .dlg p { margin: 0; font-size: var(--fs-l); text-align: center; }
 .altina .dlg .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .altina .dlg .row > * { flex: 1 1 140px; }
 .altina .dlg .stack { display: flex; flex-direction: column; gap: 14px; }
-.altina .dlg.extra { border-color: var(--yellow); }
-.altina .xrow { display: flex; gap: 14px; }
-.altina .xrow .btn { flex: 1; }
-.altina .xrem { font-size: var(--fs); text-align: center; color: var(--txt-dim); font-weight: 700; }
-@media (orientation: landscape) and (min-width: 700px) {
-  .altina .layer.sheet { place-items: end end; padding: 8px; }
-  .altina .layer.sheet .dlg { width: calc(clamp(130px, 14vw, 190px) + clamp(190px, 17vw, 240px) + 2 * var(--pad) + var(--gap)); }
-  .altina .layer.sheet .xrow { flex-direction: column; }
-}
-@media (orientation: portrait) and (max-width: 599px) { .altina .xrow { flex-direction: column; } .altina .btn.big { min-height: 88px; } }
-@media (orientation: portrait) { .altina .layer.sheet { place-items: end center; padding: 8px; } }
+.altina .dlg:focus, .altina .dlg:focus-visible { outline: none; }
+.altina .mailay .dlg { border-color: var(--yellow); }
 
-/* prêmios */
-.altina .ptable { display: grid; grid-template-columns: 1fr; gap: 8px; }
+/* premios (com desenhos) */
+.altina .ptable { display: grid; grid-template-columns: 1fr; gap: 6px; }
 @media (min-width: 900px) { .altina .ptable { grid-template-columns: 1fr 1fr; } }
-.altina .prow { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px; background: #0006; border: 2px solid #ffffff22; min-height: 72px; }
+.altina .prow { display: flex; align-items: center; gap: 12px; padding: 4px 10px; border-radius: 14px; background: #0006; border: 2px solid #ffffff22; min-height: 56px; }
 .altina .prow .pn { flex: 1; min-width: 0; font-weight: 900; font-size: var(--fs-l); line-height: 1.1; }
 .altina .prow .pn small { display: block; font-size: var(--fs); color: var(--txt-dim); font-weight: 700; }
-.altina .prow .pv { font-weight: 900; font-size: calc(26px * var(--ts)); color: var(--gold); text-align: right; white-space: nowrap; }
-.altina .mini { display: grid; grid-template-columns: repeat(5, 18px); grid-template-rows: repeat(3, 18px); gap: 2px; flex: none; }
+.altina .prow .pv { font-weight: 900; font-size: calc(26px * var(--ts)); color: var(--gold); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.altina .mini { display: grid; grid-template-columns: repeat(5, 14px); grid-template-rows: repeat(3, 14px); gap: 2px; flex: none; }
 .altina .mini i { background: #ffffff2a; border-radius: 3px; }
 .altina .mini i.x { background: var(--gold); }
 .altina .prow.jk { border-color: var(--gold); }
+@media (max-height: 760px) { .altina .prow .pn small { display: none; } .altina .prow.jk .pn small { display: block; } }
+@media (max-width: 599px) { .altina .prow.jk .pn small { font-size: 20px; } }
 
 /* ajustes */
-.altina .sgrid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-@media (min-width: 900px) and (orientation: landscape) { .altina .sgrid { grid-template-columns: 1fr 1fr; } }
+.altina .tabs { display: flex; gap: 12px; }
+.altina .tabs .tab { flex: 1; min-width: 0; padding: 4px 6px; }
+.altina .pane { display: flex; flex-direction: column; gap: 12px; }
 .altina .sset { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 14px; background: #0006; }
-.altina .sset h3 { margin: 0; font-size: var(--fs-l); color: var(--gold-l); line-height: 1.1; }
-.altina .seg { display: flex; gap: 8px; }
-.altina .seg .btn { flex: 1; padding: 4px 6px; }
-.altina .vol { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.altina .sset h3, .altina .trow h3 { margin: 0; font-size: var(--fs-l); color: var(--gold-l); line-height: 1.1; }
+.altina .seg { display: flex; gap: 12px; }
+.altina .seg .btn { flex: 1; padding: 4px 6px; min-width: 0; }
+.altina .trow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 6px 6px 12px; border-radius: 14px; background: #0006; }
+.altina .trow h3 { flex: 1; min-width: 0; }
+.altina .trow .tg { flex: 0 0 150px; padding: 4px 6px; }
+.altina .vol { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 10px; border-radius: 14px; background: #0006; }
 .altina .vol .lab { flex: 0 0 100%; font-weight: 800; }
 .altina .meter { flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 28px; }
 .altina .meter i { background: #ffffff22; border-radius: 3px; }
 .altina .meter i.on { background: var(--gold); }
 
-/* oferta / presente / celebração */
+/* presente / correio / celebracao */
 .altina .gift-ic { display: grid; place-items: center; }
 .altina .gift-ic svg { width: 96px; height: 96px; }
-.altina .bigprize { font-size: calc(56px * var(--ts)); font-weight: 900; color: var(--gold); text-align: center; line-height: 1; font-variant-numeric: tabular-nums; }
+.altina .dlg-body .gift-ic, .altina .dlg-body h2, .altina .dlg-body .bigprize { flex: none; }
+.altina .bigprize { font-size: min(calc(56px * var(--ts)), 12vw); font-weight: 900; color: var(--gold); text-align: center; line-height: 1; font-variant-numeric: tabular-nums; }
 .altina .celeb { position: relative; text-align: center; }
 .altina .celeb .big {
   font-size: min(calc(72px * var(--ts)), 15vw); font-weight: 900; line-height: 1; color: var(--gold); text-shadow: 0 4px 0 #000a;
@@ -285,54 +339,66 @@
 .altina .dots { display: flex; justify-content: center; gap: 14px; min-height: 36px; }
 .altina .dots i { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--gold); background: transparent; }
 .altina .dots i.on { background: var(--gold); }
-.altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: min(360px, 100%); margin: 0 auto; }
-.altina .keys .btn { min-height: 72px; font-size: calc(32px * var(--ts)); }
+.altina .pinmsg { min-height: 1.2em; }
+.altina .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: min(360px, 100%); margin: 0 auto; }
+.altina .keys .btn { min-height: 68px; font-size: calc(32px * var(--ts)); }
 .altina .adm pre, .altina .adm textarea {
-  width: 100%; margin: 0; max-height: 28vh; min-height: 90px; overflow: auto; padding: 8px; border-radius: 10px; background: #000a; color: #d8ffe4;
-  font: 20px/1.3 ui-monospace, Menlo, Consolas, monospace; user-select: text; -webkit-user-select: text; border: 2px solid #ffffff33; resize: vertical;
+  width: 100%; margin: 0; max-height: 18vh; min-height: 72px; overflow: auto; padding: 8px; border-radius: 10px; background: #000a; color: #d8ffe4;
+  font: 20px/1.3 ui-monospace, Menlo, Consolas, monospace; user-select: text; -webkit-user-select: text; border: 2px solid #ffffff33; resize: none; flex: none;
 }
-.altina .adm .msg { font-size: var(--fs); color: var(--gold-l); text-align: center; min-height: 1.2em; }
+.altina .adm .msg { font-size: var(--fs); color: var(--gold-l); text-align: center; min-height: 1.2em; flex: none; }
+
+/* ---------- retrato / celular ---------- */
+@media (orientation: portrait) {
+  .altina .ballsec { grid-template-columns: auto auto; justify-content: center; }
+  .altina .trail { width: min(100%, 620px); justify-self: center; }
+  .altina .xpanel { width: min(100%, 620px); justify-self: center; }
+  .altina .ptab { flex-direction: row; align-items: center; gap: 10px; padding: 4px 8px; }
+  .altina .ptab .ph { flex: none; padding: 0; }
+  .altina .prows { display: flex; flex: 1; gap: 8px; align-content: normal; }
+  .altina .pr { flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 2px 4px; font-size: calc(22px * var(--ts)); }
+  .altina.has-mail .logo .lt { display: none; }
+}
+@media (orientation: portrait) and (max-width: 599px) {
+  .altina.ts-grande { --ts: 1.06; --tsb: 1.03; }
+  .altina.ts-muito { --ts: 1.12; --tsb: 1.05; }
+  .altina .stat { max-width: none; min-height: 0; padding: 2px 8px; }
+  .altina .stat .val { font-size: calc(26px * var(--ts)); }
+  .altina .top .btn.icon { width: 64px; height: 64px; }
+  .altina .caption { font-size: calc(21px * var(--ts)); line-height: 1.05; }
+  .altina .mailb { width: 100%; height: 64px; display: flex; gap: 10px; justify-content: center; align-items: center; border-radius: 18px; }
+  .altina .mailb svg { width: 40px; height: 40px; }
+  .altina .mailb .ml { display: inline; font-size: calc(22px * var(--ts)); font-weight: 900; color: var(--gold-l); }
+  .altina .mailb .clv { right: 6px; top: -10px; }
+  .altina .ptab .ph { display: none; }
+  .altina .pr { font-size: calc(20px * var(--ts)); letter-spacing: -.02em; padding: 2px 0; }
+  .altina .pr .full { display: none; }
+  .altina .pr .short { display: inline; }
+  .altina .prows { gap: 4px; }
+  .altina .ptab { padding: 4px 6px; }
+  .altina .card { border-width: 4px; padding: 2px 4px 4px; border-radius: 14px; }
+  .altina .card-head { min-height: 30px; }
+  .altina .card-num { width: 28px; height: 28px; font-size: 20px; }
+  .altina .falta .full { display: none; }
+  .altina .falta .short { display: inline; }
+  .altina .cell { border-width: 1px; border-radius: 5px; }
+  .altina .cell::before { height: 100%; width: 100%; aspect-ratio: auto; border-radius: 5px; }
+  .altina .seal .st { font-size: calc(22px * var(--tsb)); padding: 4px 8px; border-width: 3px; }
+  .altina .dlg { padding: 12px; gap: 10px; }
+  .altina .layer { padding: 8px; }
+  .altina .trow .tg { flex-basis: 132px; }
+  .altina .btn.big { min-height: 88px; }
+}
 
 /* ---------- modo leve: sem brilhos nem particulas ---------- */
 .altina.light *, .altina.light *::before, .altina.light *::after { animation: none !important; transition: none !important; box-shadow: none !important; text-shadow: none !important; }
 .altina.light .confetti, .altina.light .ball.shine::after { display: none !important; }
 .altina.light .cell.miss::after { display: none; }
+.altina.light .pr.win::after { opacity: .85; }
 .altina.light .ball { background: var(--bb); }
 .altina.light .btn.play { box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .altina *, .altina *::before, .altina *::after { animation: none !important; transition: none !important; }
   .altina .confetti { display: none; }
+  .altina .pr.win::after { opacity: .85; }
 }
-
-/* ---------- ocultacoes por tamanho (depois dos displays base) ---------- */
-@media (orientation: portrait) and (max-width: 599px) { .altina .ballbox, .altina .hist { display: none; } }
-@media (orientation: landscape) and (max-height: 520px) { .altina .hist { display: none; } }
-
-.altina .bar .btn .sh { display: none; }
-@media (orientation: portrait) and (max-width: 599px) {
-  .altina.ts-grande { --ts: 1.06; --tsb: 1.03; }
-  .altina.ts-muito { --ts: 1.12; --tsb: 1.05; }
-  .altina .bar .btn .sh { display: inline; }
-  .altina .bar .btn .lg { display: none; }
-  .altina .bar .btn.sec svg { display: none; }
-  .altina .bar .btn.sec { padding: 4px 2px; letter-spacing: -.02em; }
-  .altina .top { display: grid; grid-template-columns: minmax(0, 1fr) 64px 64px; gap: 6px 8px; min-height: 0; }
-  .altina .top .logo, .altina .top .sp { display: none; }
-  .altina .top .stat { grid-column: 1; flex-direction: row; align-items: baseline; justify-content: space-between; min-height: 0; padding: 2px 8px; max-width: none; gap: 6px; }
-  .altina .top .stat .val { font-size: calc(26px * var(--tsb)); }
-  .altina .top .stat .lab { font-size: calc(20px * var(--tsb)); white-space: nowrap; }
-  .altina .top .stat { overflow: hidden; }
-  .altina .top > .btn { grid-row: 1 / span 2; align-self: center; width: 64px; height: 64px; }
-  .altina .top > .btn:nth-last-child(2) { grid-column: 2; }
-  .altina .top > .btn:last-child { grid-column: 3; }
-  .altina .card-head { min-height: 34px; }
-  .altina .seal { padding-left: 3px; padding-right: 6px; }
-  .altina .seal svg { display: none; }
-  .altina .card.has-falta .seal { display: none; }
-  .altina .cell { border-width: 1px; border-radius: 5px; }
-  .altina .cell::before { height: 100%; width: 100%; aspect-ratio: auto; border-radius: 5px; }
-}
-.altina .dlg:focus, .altina .dlg:focus-visible { outline: none; }
-
-@media (orientation: portrait) and (max-width: 599px) { .altina .bar, .altina .bet-g { gap: 12px; } .altina .bar { row-gap: 10px; } }
-.altina .layer > .dlg { position: relative; z-index: 51; }
