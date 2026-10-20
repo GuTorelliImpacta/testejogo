@@ -51,11 +51,12 @@ export function extraInfo(
   active: boolean[],
   drawn: ReadonlySet<number>,
   bet: number,
+  costFactor = 0.08,
 ): { cost: number; improves: Improve[] } {
   const improves = extraImproves(cards, active, drawn, bet);
   const maxGain = improves.reduce((m, x) => Math.max(m, x.gain), 0);
   if (maxGain <= 0) return { cost: 0, improves: [] };
-  return { cost: niceRound(Math.max(1, Math.round(0.08 * maxGain))), improves };
+  return { cost: niceRound(Math.max(1, Math.round(costFactor * maxGain))), improves };
 }
 
 export function nextJackpot(current: number, totalBet: number): number {
@@ -81,6 +82,7 @@ export function extraCost(
   active: boolean[],
   drawn: ReadonlySet<number>,
   bet: number,
+  costFactor = 0.08,
 ): number {
-  return extraInfo(cards, active, drawn, bet).cost;
+  return extraInfo(cards, active, drawn, bet, costFactor).cost;
 }

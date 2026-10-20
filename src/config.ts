@@ -1,4 +1,4 @@
-import type { PatternId, RuntimeTuning, Settings } from './types';
+import type { Level3, PatternId, RuntimeTuning, Settings } from './types';
 
 export const GAME_NAME = 'Altina da Sorte🍀';
 export const PLAYER = 'Dona Altina';
@@ -124,3 +124,28 @@ export function effectivePin(saved: string | null | undefined): string {
 
 /** Fator do custo da bola extra (8% do maior ganho adicional; "mais barata" = 4%). */
 export const COST_FACTOR: Record<RuntimeTuning['custoExtra'], number> = { normal: 0.08, barata: 0.04 };
+
+// ---------- v3: presets do Diretor (valores calibrados no simulador: `npm run simulate -- --preset all`) ----------
+export type PesosTeto = Partial<Record<PatternId | 'nada', number>>;
+
+/** Pesos do teto da rodada comum por nível de "Prêmios do dia a dia" e conjunto de padrões. `nada` = rodada sem prêmio. */
+export const PREMIOS_PRESETS: Record<Level3, Record<PatternSetName, PesosTeto>> = {
+  menos: {
+    classico: { nada: 0.66, linha: 0.31, linhaDupla: 0.03 },
+    variado: { nada: 0.66, linha: 0.17, cantos: 0.09, piramide: 0.04, u: 0.02, linhaDupla: 0.01, moldura: 0.01 },
+  },
+  normal: {
+    classico: { nada: 0.6, linha: 0.35, linhaDupla: 0.06 },
+    variado: { nada: 0.6, linha: 0.19, cantos: 0.1, piramide: 0.05, u: 0.03, linhaDupla: 0.015, moldura: 0.015 },
+  },
+  mais: {
+    classico: { nada: 0.54, linha: 0.39, linhaDupla: 0.08 },
+    variado: { nada: 0.54, linha: 0.21, cantos: 0.11, piramide: 0.06, u: 0.035, linhaDupla: 0.02, moldura: 0.02 },
+  },
+};
+
+/** Frequência de oferta de bola extra: multiplica as chances base de oferta (hit/miss) da rodada comum. */
+export const EXTRA_PRESETS: Record<Level3, number> = { menos: 0.5, normal: 1, mais: 1.4 };
+
+/** Fração das ofertas de bola extra que são grátis. */
+export const GRATIS_PRESETS: Record<Level3, number> = { menos: 0.08, normal: 0.175, mais: 0.3 };

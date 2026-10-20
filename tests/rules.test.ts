@@ -105,6 +105,21 @@ describe('prêmios e bola extra', () => {
     const drawn = new Set(fixed.nums.filter((_, i) => (MASKS.linha[0] & (1 << i)) !== 0 && i !== 0));
     expect(extraCost([fixed], [true], drawn, 5)).toBeGreaterThan(0);
   });
+  it('costFactor barato reduz o custo e o padrão é 0,08', () => {
+    const drawn = new Set(fixed.nums.filter((_, i) => (MASKS.linha[0] & (1 << i)) !== 0 && i !== 0));
+    const normal = extraCost([fixed], [true], drawn, 10);
+    const barata = extraCost([fixed], [true], drawn, 10, 0.04);
+    expect(extraCost([fixed], [true], drawn, 10, 0.08)).toBe(normal);
+    expect(barata).toBeGreaterThan(0);
+    expect(barata).toBeLessThan(normal);
+    const mk = (cf?: number) => {
+      const s = new RoundSession([fixed], [true], 10, 5000, planFrom([...drawn]), 0, cf);
+      for (let i = 0; i < drawn.size; i++) s.nextMain();
+      return s.offer();
+    };
+    expect(mk()!.cost).toBe(normal);
+    expect(mk(0.04)!.cost).toBe(barata);
+  });
 });
 
 function planFrom(order: number[], free?: boolean[]): DrawPlan {

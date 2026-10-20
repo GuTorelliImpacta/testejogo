@@ -40,6 +40,7 @@ export class RoundSession {
     readonly jackpot: number,
     readonly plan: DrawPlan,
     extraSpent = 0,
+    readonly costFactor = 0.08,
   ) {
     this.best = cards.map(() => null);
     this.extraSpent = extraSpent;
@@ -52,8 +53,8 @@ export class RoundSession {
   }
 
   /** Reconstrói a sessão de uma rodada salva repetindo as bolas já sorteadas (sem cobrar de novo). */
-  static fromSaved(sr: SavedRound): RoundSession {
-    const s = new RoundSession(sr.cards, sr.active, sr.bet, sr.jackpot, sr.plan);
+  static fromSaved(sr: SavedRound, costFactor = 0.08): RoundSession {
+    const s = new RoundSession(sr.cards, sr.active, sr.bet, sr.jackpot, sr.plan, 0, costFactor);
     for (let i = 0; i < sr.mainIdx; i++) s.nextMain();
     for (let i = 0; i < sr.extrasUsed; i++) {
       s.apply(sr.plan.extras[i], s.extrasUsed++, true);
@@ -89,7 +90,7 @@ export class RoundSession {
   offer(): ExtraOffer | null {
     const max = Math.min(BALLS_EXTRA_MAX, this.plan.extras.length);
     if (this.extrasUsed >= max) return null;
-    const info = extraInfo(this.cards, this.active, this.drawn, this.bet);
+    const info = extraInfo(this.cards, this.active, this.drawn, this.bet, this.costFactor);
     if (info.cost <= 0) return null;
     const free = this.plan.free?.[this.extrasUsed] === true;
     return { cost: free ? 0 : info.cost, free, remaining: max - this.extrasUsed, improves: info.improves };

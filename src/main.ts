@@ -1,5 +1,5 @@
 import { bus } from './events';
-import { createGame } from './game';
+import { createGame, handleResetPinParam } from './game';
 import { createAudio } from './audio';
 import { mountUI, setSpokenCaption } from './ui';
 
@@ -7,6 +7,15 @@ const root = document.getElementById('app')!;
 const audio = createAudio(bus);
 const game = createGame(audio);
 const ui = mountUI(root, game);
+
+// ?resetpin=1: o neto volta ao PIN padrão confirmando com o PIN padrão.
+try {
+  if (handleResetPinParam(game, location.search, () => prompt('Digite o PIN padrão para restaurar:'))) {
+    history.replaceState(null, '', location.pathname);
+  }
+} catch {
+  /* ignora */
+}
 
 audio.onCaption(setSpokenCaption);
 bus.on('stateChanged', () => ui.render());

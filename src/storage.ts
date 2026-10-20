@@ -1,11 +1,12 @@
 import { BALLS_EXTRA_MAX, BALLS_MAIN, MAX_NUMBER } from './types';
-import { BET_OPTIONS, DEFAULT_BET, DEFAULT_SETTINGS, JACKPOT_BASE, START_CREDITS } from './config';
+import { BET_OPTIONS, DEFAULT_BET, DEFAULT_SETTINGS, DEFAULT_TUNING, JACKPOT_BASE, START_CREDITS } from './config';
 import { generateCards, isValidCard } from './cards';
 import { cryptoRng } from './rng';
 import { initialDirector } from './director';
-import type { MailState, SaveData, Stats } from './types';
+import type { MailState, RuntimeTuning, SaveData, Stats } from './types';
 
-const KEY = 'altina-da-sorte:v2';
+const KEY = 'altina-da-sorte:v3';
+const KEY_V2 = 'altina-da-sorte:v2';
 const KEY_V1 = 'altina-da-sorte:v1';
 
 export function emptyMail(): MailState {
@@ -27,7 +28,7 @@ export function emptyStats(): Stats {
 
 export function freshSave(now: number): SaveData {
   return {
-    version: 2,
+    version: 3,
     credits: START_CREDITS,
     bet: DEFAULT_BET,
     cards: generateCards(cryptoRng),
@@ -38,6 +39,8 @@ export function freshSave(now: number): SaveData {
     stats: emptyStats(),
     lastDailyBonus: '',
     mail: emptyMail(),
+    tuning: { ...DEFAULT_TUNING },
+    adminPin: null,
     turboRounds: 0,
     round: null,
   };
@@ -51,6 +54,32 @@ function nearestBet(v: unknown): number {
   let best = BET_OPTIONS[0];
   for (const b of BET_OPTIONS) if (Math.abs(b - v) < Math.abs(best - v)) best = b;
   return best;
+}
+
+function oneOf<T>(v: unknown, opts: readonly T[], d: T): T {
+  for (let i = 0; i < opts.length; i++) if (opts[i] === v) return opts[i];
+  return d;
+}
+
+/** Valida `tuning` campo a campo: valor fora do enum volta ao padrão. */
+export function validTuning(t: unknown): RuntimeTuning {
+  const r = (t && typeof t === 'object' ? t : {}) as Record<string, unknown>;
+  const D = DEFAULT_TUNING;
+  const L3 = ['menos', 'normal', 'mais'] as const;
+  return {
+    bingosPorMes: oneOf(r.bingosPorMes, ['1', '2', '2-3', '3-4'] as const, D.bingosPorMes),
+    premiosDoDia: oneOf(r.premiosDoDia, L3, D.premiosDoDia),
+    ofertaExtra: oneOf(r.ofertaExtra, L3, D.ofertaExtra),
+    chanceGratis: oneOf(r.chanceGratis, L3, D.chanceGratis),
+    custoExtra: oneOf(r.custoExtra, ['barata', 'normal'] as const, D.custoExtra),
+    presente: oneOf(r.presente, [500, 1000, 2000] as const, D.presente),
+    correioDiario: oneOf(r.correioDiario, [300, 500] as const, D.correioDiario),
+    conjuntoPadroes: oneOf(r.conjuntoPadroes, ['classico', 'variado'] as const, D.conjuntoPadroes),
+  };
+}
+
+export function validPin(p: unknown): string | null {
+  return typeof p === 'string' && /^\d{4}$/.test(p) ? p : null;
 }
 
 function validMail(m: unknown): MailState {
@@ -67,17 +96,20 @@ function validMail(m: unknown): MailState {
 }
 
 /**
- * Valida e completa dados vindos do disco/importação. Aceita v1 e v2; devolve null se inutilizável.
+ * Valida e completa dados vindos do disco/importação. Aceita v1, v2 e v3; devolve null se inutilizável.
  * v1 -> v2: preserva saldo, acumulado, diretor, estatísticas, configurações e bônus diário;
  * DESCARTA a rodada em andamento, gera cartelas novas (1–90) e ajusta a aposta (20 -> 10).
+ * v2 -> v3: preserva tudo (inclusive a rodada em andamento) e acrescenta `tuning` padrão e `adminPin` null.
  */
 export function migrate(raw: unknown, now: number): SaveData | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Partial<Omit<SaveData, 'version'>> & { version?: number };
-  if (r.version !== 1 && r.version !== 2) return null;
+  if (r.version !== 1 && r.version !== 2 && r.version !== 3) return null;
   const base = freshSave(now);
   const common = {
-    version: 2 as const,
+    version: 3 as const,
+    tuning: r.version === 3 ? validTuning((r as { tuning?: unknown }).tuning) : { ...DEFAULT_TUNING },
+    adminPin: r.version === 3 ? validPin((r as { adminPin?: unknown }).adminPin) : null,
     credits: Math.max(0, Math.floor(num(r.credits, base.credits))),
     jackpot: Math.max(JACKPOT_BASE, num(r.jackpot, base.jackpot)),
     settings: { ...DEFAULT_SETTINGS, ...(r.settings ?? {}) },
@@ -131,7 +163,7 @@ function validRound(x: unknown): x is NonNullable<SaveData['round']> {
 
 export function load(now: number): SaveData {
   try {
-    for (const key of [KEY, KEY_V1]) {
+    for (const key of [KEY, KEY_V2, KEY_V1]) {
       const s = localStorage.getItem(key);
       if (!s) continue;
       const d = migrate(JSON.parse(s), now);

@@ -2,14 +2,15 @@ import { bus } from './events';
 import {
   ADMIN_PIN,
   BET_OPTIONS,
-  GIFT_AMOUNT,
+  COST_FACTOR,
+  DEFAULT_TUNING,
   GIFT_THRESHOLD,
   JACKPOT_BASE,
   MAIL,
   SPEED_MS,
   START_CREDITS,
   TURBO_MS,
-  getPatternSet,
+  effectivePin,
   setPatternSet,
   type PatternSetName,
 } from './config';
@@ -18,10 +19,11 @@ import { cryptoRng } from './rng';
 import { RoundSession, type Step } from './round';
 import { nextJackpot, prizeFor, prizeTable } from './payout';
 import { levelOf } from './patterns';
-import { planRound, afterRound } from './director';
-import { load, migrate, save, saveNow, emptyStats, emptyMail } from './storage';
+import { planRound, afterRound, monthKey } from './director';
+import { getDeviceInfo } from './perf';
+import { load, migrate, save, saveNow, emptyStats, emptyMail, validTuning } from './storage';
 import type { GameApi, GameView } from './gameApi';
-import type { GamePhase, RoundSummary, SaveData, Settings } from './types';
+import type { AdminStats, GamePhase, RoundSummary, RuntimeTuning, SaveData, Settings } from './types';
 import { BALLS_EXTRA_MAX, BALLS_MAIN } from './types';
 import { jackpotShare } from './config';
 
@@ -37,11 +39,28 @@ export interface AudioPort {
 }
 
 const LEVEL_CELEBRATE = levelOf('linhaDupla');
-const PATTERN_SET_KEY = 'altina-da-sorte:patternSet';
+/** Chave antiga (v2.x) do conjunto de padrões; hoje vive em data.tuning. Só é lida para migrar. */
+const LEGACY_PATTERN_SET_KEY = 'altina-da-sorte:patternSet';
 
 function dayKey(t: number): string {
   const d = new Date(t);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * `?resetpin=1`: pede o PIN padrão (via `confirm`) e, se conferir, volta o PIN para o padrão.
+ * Função pura: quem chama (main.ts) fornece `search` (location.search) e `confirm` (ex.: prompt).
+ * Devolve true só se o PIN foi redefinido. Nunca registra o PIN em lugar nenhum.
+ */
+export function handleResetPinParam(
+  api: Pick<GameApi, 'admin'>,
+  search: string,
+  confirm: () => string | null,
+): boolean {
+  if (!/(^|[?&])resetpin=1(&|$)/.test(search)) return false;
+  const typed = confirm();
+  if (typed === null || typed === undefined) return false;
+  return api.admin.resetPin(String(typed));
 }
 
 export function createGame(audio: AudioPort, now: () => number = Date.now): GameApi {
@@ -64,16 +83,29 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
   let celebrationResolver: (() => void) | null = null;
 
   try {
-    const ps = localStorage.getItem(PATTERN_SET_KEY);
-    if (ps === 'classico' || ps === 'variado') setPatternSet(ps);
+    // migra a chave separada antiga para data.tuning (uma vez) e a remove
+    const ps = localStorage.getItem(LEGACY_PATTERN_SET_KEY);
+    if (ps === 'classico' || ps === 'variado') {
+      if (data.tuning.conjuntoPadroes === DEFAULT_TUNING.conjuntoPadroes) {
+        data.tuning = { ...data.tuning, conjuntoPadroes: ps };
+        saveNow(data);
+      }
+    }
+    if (ps !== null) localStorage.removeItem(LEGACY_PATTERN_SET_KEY);
   } catch {
     /* ignora */
   }
+  setPatternSet(data.tuning.conjuntoPadroes);
 
   const activeCount = () => data.active.filter(Boolean).length;
   const totalBet = () => data.bet * activeCount();
   const changed = () => bus.emit('stateChanged');
   const turbo = () => data.settings.turbo;
+  const costFactor = () => COST_FACTOR[data.tuning.custoExtra];
+  /** Troca de conjunto de padrões só vale fora de rodada (nunca muda o que está em jogo). */
+  const applyPatternSet = () => {
+    if (!session) setPatternSet(data.tuning.conjuntoPadroes);
+  };
 
   function applyAudioSettings(): void {
     const s = data.settings;
@@ -209,9 +241,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       extraOffer = null;
       if (!buy) break;
       if (data.credits < offer.cost) {
-        data.credits += GIFT_AMOUNT; // créditos infinitos
+        data.credits += data.tuning.presente; // créditos infinitos
         data.stats.recargas++;
-        bus.emit('giftCredits', { amount: GIFT_AMOUNT });
+        bus.emit('giftCredits', { amount: data.tuning.presente });
       }
       data.credits -= offer.cost;
       phase = 'extraDrawing';
@@ -270,6 +302,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       if (id !== runId) return;
     }
     phase = 'idle';
+    applyPatternSet();
     maybeBonusMail();
     persist(false);
     saveNow(data);
@@ -308,8 +341,8 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
     // tablet ficou aberto e virou o dia: o correio diário chega sem precisar reabrir o jogo
     const today = dayKey(now());
     if (data.lastDailyBonus !== today && !data.mail.pending) {
-      data.mail.pending = { kind: 'daily', amount: MAIL.dailyAmount };
-      bus.emit('mailbox', { kind: 'daily', amount: MAIL.dailyAmount, state: 'arrived' });
+      data.mail.pending = { kind: 'daily', amount: data.tuning.correioDiario };
+      bus.emit('mailbox', { kind: 'daily', amount: data.tuning.correioDiario, state: 'arrived' });
       return;
     }
     const m = data.mail;
@@ -375,7 +408,7 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       void audio.greet(new Date(t).getHours());
       if (data.round) {
         // retoma a rodada exatamente de onde parou
-        const s = RoundSession.fromSaved(data.round);
+        const s = RoundSession.fromSaved(data.round, costFactor());
         drawn = [...s.drawn];
         current = drawn[drawn.length - 1] ?? null;
         session = s;
@@ -395,8 +428,8 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       phase = 'idle';
       rollMailDay();
       if (data.lastDailyBonus !== today && !data.mail.pending) {
-        data.mail.pending = { kind: 'daily', amount: MAIL.dailyAmount };
-        bus.emit('mailbox', { kind: 'daily', amount: MAIL.dailyAmount, state: 'arrived' });
+        data.mail.pending = { kind: 'daily', amount: data.tuning.correioDiario };
+        bus.emit('mailbox', { kind: 'daily', amount: data.tuning.correioDiario, state: 'arrived' });
       }
       audio.setMode('calm');
       persist(false);
@@ -408,11 +441,12 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
       mailOpen = false;
       if (data.credits < totalBet() || data.credits < GIFT_THRESHOLD) {
         phase = 'gift';
-        giftAmount = GIFT_AMOUNT;
-        bus.emit('giftCredits', { amount: GIFT_AMOUNT });
+        giftAmount = data.tuning.presente;
+        bus.emit('giftCredits', { amount: giftAmount });
         changed();
         return;
       }
+      setPatternSet(data.tuning.conjuntoPadroes); // ajustes novos valem a partir desta rodada
       const bet = totalBet();
       data.credits -= bet;
       data.jackpot = nextJackpot(data.jackpot, bet);
@@ -423,8 +457,9 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         now: now(),
         director: data.director,
         rng: cryptoRng,
+        tuning: data.tuning,
       });
-      const s = new RoundSession(data.cards, data.active, data.bet, Math.floor(data.jackpot), plan);
+      const s = new RoundSession(data.cards, data.active, data.bet, Math.floor(data.jackpot), plan, 0, costFactor());
       roundStartedAt = now();
       bus.emit('roundStart', { bet: data.bet, totalBet: bet });
       startSession(s);
@@ -535,37 +570,90 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
 
     admin: {
       unlock(pin) {
-        unlockedAdmin = pin === ADMIN_PIN;
+        unlockedAdmin = typeof pin === 'string' && pin === effectivePin(data.adminPin);
         return unlockedAdmin;
       },
-      snapshot() {
+      lock() {
+        unlockedAdmin = false;
+      },
+      stats(): AdminStats | null {
         if (!unlockedAdmin) return null;
         const st = data.stats;
+        const dir = data.director;
         const days = Object.keys(st.rodadasPorDia);
         const avg = days.length ? st.rodadas / days.length : 0;
+        const t = now();
         return {
-          credits: data.credits,
-          jackpot: Math.floor(data.jackpot),
-          conjuntoDePadroes: getPatternSet(),
-          historicoBingos: data.director.historicoBingos.map((t) => new Date(t).toLocaleDateString('pt-BR')),
-          bingosPorMes: data.director.bingosPorMes,
+          creditos: data.credits,
+          acumulado: Math.floor(data.jackpot),
+          bingosNoMes: dir.bingosPorMes[monthKey(t)] ?? 0,
+          ultimosBingos: dir.historicoBingos
+            .slice(-8)
+            .reverse()
+            .map((ms) => new Date(ms).toLocaleDateString('pt-BR')),
+          diasDesdeUltimoBingo: dir.ultimoBingoEm === null ? null : Math.max(0, Math.floor((t - dir.ultimoBingoEm) / 86400000)),
           rodadas: st.rodadas,
           rodadasPorDia: Math.round(avg * 10) / 10,
+          premiosPorTipo: { ...st.porPadrao },
           rtpComum: st.apostado ? Math.round((st.ganho / st.apostado) * 1000) / 1000 : 0,
           rtpTotal: st.apostadoTotal ? Math.round((st.ganhoTotal / st.apostadoTotal) * 1000) / 1000 : 0,
           recargas: st.recargas,
-          porPadrao: st.porPadrao,
+          tuning: { ...data.tuning },
         };
+      },
+      device() {
+        return unlockedAdmin ? getDeviceInfo() : null;
+      },
+      getTuning(): RuntimeTuning {
+        return { ...(unlockedAdmin ? data.tuning : DEFAULT_TUNING) };
+      },
+      setTuning(p) {
+        if (!unlockedAdmin || !p || typeof p !== 'object') return;
+        // só valores válidos entram: cada campo é validado contra o seu enum (inválido = ignorado)
+        const checked = validTuning({ ...data.tuning, ...p }) as unknown as Record<string, unknown>;
+        const next = { ...data.tuning } as unknown as Record<string, unknown>;
+        const src = p as Record<string, unknown>;
+        for (const k of Object.keys(src)) {
+          if (k in next && checked[k] === src[k]) next[k] = src[k];
+        }
+        data.tuning = next as unknown as RuntimeTuning;
+        // a rodada em curso mantém plano, padrões e custo; o resto vale a partir da próxima
+        applyPatternSet();
+        saveNow(data);
+        changed();
+      },
+      resetTuning() {
+        if (!unlockedAdmin) return;
+        data.tuning = { ...DEFAULT_TUNING };
+        applyPatternSet();
+        saveNow(data);
+        changed();
+      },
+      changePin(oldPin, newPin) {
+        if (!unlockedAdmin) return false;
+        if (typeof oldPin !== 'string' || oldPin !== effectivePin(data.adminPin)) return false;
+        if (typeof newPin !== 'string' || !/^\d{4}$/.test(newPin)) return false;
+        data.adminPin = newPin;
+        saveNow(data);
+        return true;
+      },
+      resetPin(defaultPin) {
+        // autentica pelo PIN padrão do código (não exige unlock; usado por ?resetpin=1)
+        if (typeof defaultPin !== 'string' || defaultPin !== ADMIN_PIN) return false;
+        data.adminPin = null;
+        saveNow(data);
+        return true;
       },
       exportJson() {
         return unlockedAdmin ? JSON.stringify({ ...data, round: null }) : '';
       },
       importJson(s) {
-        if (!unlockedAdmin) return false;
+        if (!unlockedAdmin || session) return false;
         try {
           const d = migrate(JSON.parse(s), now());
           if (!d) return false;
           data = { ...d, round: null };
+          setPatternSet(data.tuning.conjuntoPadroes);
           saveNow(data);
           changed();
           return true;
@@ -587,14 +675,8 @@ export function createGame(audio: AudioPort, now: () => number = Date.now): Game
         changed();
       },
       setPatternSet(name: PatternSetName) {
-        if (!unlockedAdmin || phase !== 'idle') return;
-        setPatternSet(name);
-        try {
-          localStorage.setItem(PATTERN_SET_KEY, name);
-        } catch {
-          /* ignora */
-        }
-        changed();
+        if (!unlockedAdmin || (name !== 'classico' && name !== 'variado')) return;
+        api.admin.setTuning({ conjuntoPadroes: name });
       },
     },
   };

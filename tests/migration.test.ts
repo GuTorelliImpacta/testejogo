@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { migrate, freshSave } from '../src/storage';
 import { isValidCard } from '../src/cards';
-import { DEFAULT_SETTINGS } from '../src/config';
+import { DEFAULT_SETTINGS, DEFAULT_TUNING } from '../src/config';
 
 const NOW = Date.UTC(2026, 9, 20);
 
@@ -25,10 +25,10 @@ const v1 = () => ({
   round: { bet: 5, jackpot: 5000, plan: { main: [], extras: [] }, mainIdx: 3, extrasUsed: 0, cards: [], active: [true] },
 });
 
-describe('migração v1 -> v2', () => {
+describe('migração v1 -> v3', () => {
   it('preserva saldo, acumulado, diretor, stats e configurações', () => {
     const m = migrate(v1(), NOW)!;
-    expect(m.version).toBe(2);
+    expect(m.version).toBe(3);
     expect(m.credits).toBe(4321);
     expect(m.jackpot).toBeCloseTo(7123.45);
     expect(m.director.historicoBingos).toEqual([100, 111]);
@@ -58,8 +58,8 @@ describe('migração v1 -> v2', () => {
   });
 });
 
-describe('save v2', () => {
-  it('aceita um save v2 válido e preserva tudo', () => {
+describe('save v3', () => {
+  it('aceita um save v3 válido e preserva tudo', () => {
     const f = freshSave(NOW);
     f.credits = 999;
     f.bet = 7;
@@ -69,7 +69,8 @@ describe('save v2', () => {
     expect(m).toEqual(f);
   });
   it('rejeita versões desconhecidas e lixo', () => {
-    expect(migrate({ version: 3 }, NOW)).toBeNull();
+    expect(migrate({ version: 4 }, NOW)).toBeNull();
+    expect(migrate({ version: 0 }, NOW)).toBeNull();
     expect(migrate(null, NOW)).toBeNull();
   });
   it('corrige aposta e cartelas inválidas', () => {
@@ -98,5 +99,62 @@ describe('save v2', () => {
     expect(bad((r) => (r.plan.extras = all.slice(30, 40)))).toBeNull();
     expect(bad((r) => (r.plan.main[0] = 91))).toBeNull();
     expect(bad((r) => (r.bet = 20))).toBeNull();
+  });
+});
+
+describe('migração v2 -> v3', () => {
+  const v2 = () => {
+    const f: any = JSON.parse(JSON.stringify(freshSave(NOW)));
+    delete f.tuning;
+    delete f.adminPin;
+    f.version = 2;
+    f.credits = 777;
+    f.jackpot = 6543.21;
+    f.lastDailyBonus = '2026-10-19';
+    f.settings.speed = 'lenta';
+    f.director = { ultimoBingoEm: 222, bingosPorMes: { '2026-10': 1 }, rodadasDesdeUltimoBingo: 4, primeiroUsoEm: 9, historicoBingos: [222] };
+    f.stats.rodadas = 31;
+    f.stats.recargas = 3;
+    f.mail = { day: '2026-10-20', bonusToday: 1, playMs: 1234, pending: { kind: 'daily', amount: 300 } };
+    const all = Array.from({ length: 90 }, (_, i) => i + 1);
+    f.round = {
+      extraSpent: 6, bet: 5, jackpot: 5000,
+      plan: { main: all.slice(0, 30), extras: all.slice(30, 39), free: [true] },
+      mainIdx: 12, extrasUsed: 0, cards: f.cards, active: [true, true, false, true],
+    };
+    return f;
+  };
+  it('preserva tudo, inclusive a rodada em andamento, e põe tuning padrão', () => {
+    const src = v2();
+    const m = migrate(JSON.parse(JSON.stringify(src)), NOW)!;
+    expect(m.version).toBe(3);
+    expect(m.credits).toBe(777);
+    expect(m.jackpot).toBeCloseTo(6543.21);
+    expect(m.settings.speed).toBe('lenta');
+    expect(m.director).toEqual(src.director);
+    expect(m.stats.rodadas).toBe(31);
+    expect(m.stats.recargas).toBe(3);
+    expect(m.mail).toEqual(src.mail);
+    expect(m.lastDailyBonus).toBe('2026-10-19');
+    expect(m.round).toEqual(src.round);
+    expect(m.cards).toEqual(src.cards);
+    expect(m.tuning).toEqual(DEFAULT_TUNING);
+    expect(m.adminPin).toBeNull();
+  });
+  it('v1 continua descartando a rodada', () => {
+    expect(migrate(v1(), NOW)!.round).toBeNull();
+  });
+  it('valida tuning e adminPin estritamente', () => {
+    const f = v2();
+    f.version = 3;
+    f.tuning = { bingosPorMes: '9', premiosDoDia: 'mais', ofertaExtra: 5, chanceGratis: 'menos', custoExtra: 'barata', presente: 700, correioDiario: 500, conjuntoPadroes: 'variado' };
+    f.adminPin = '12a4';
+    const m = migrate(f, NOW)!;
+    expect(m.tuning).toEqual({ ...DEFAULT_TUNING, premiosDoDia: 'mais', chanceGratis: 'menos', custoExtra: 'barata', correioDiario: 500, conjuntoPadroes: 'variado' });
+    expect(m.adminPin).toBeNull();
+    f.adminPin = '4321';
+    expect(migrate(f, NOW)!.adminPin).toBe('4321');
+    f.tuning = 'lixo';
+    expect(migrate(f, NOW)!.tuning).toEqual(DEFAULT_TUNING);
   });
 });

@@ -1,6 +1,8 @@
-import type { Card, DirectorState, DrawPlan, PatternId } from './types';
-import { TUNING, getPatternSet } from './config';
-import type { PatternSetName } from './config';
+import type { Card, DirectorState, DrawPlan, PatternId, RuntimeTuning } from './types';
+import {
+  TUNING, BINGO_PRESETS, COST_FACTOR, DEFAULT_TUNING, EXTRA_PRESETS, GRATIS_PRESETS, PREMIOS_PRESETS, getPatternSet,
+} from './config';
+import type { PatternSetName, PesosTeto } from './config';
 import type { Rng } from './rng';
 import { randInt, weightedIndex } from './rng';
 import type { DrawTarget, ExtraMode } from './drawBuilder';
@@ -40,6 +42,49 @@ export const DIRECTOR_PARAMS = {
   hitComPremio: 0.25,
   missComPremio: 0.1,
 };
+
+// ---------------------------------------------------------------------------
+// Configuração resolvida (injetada; sem estado global)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedTuning {
+  bingoPorMesAlvo: number;
+  bingoMaxPorMes: number;
+  diasMinEntreBingos: number;
+  diasAlvoEntreBingos: number;
+  diasForcarBingo: number;
+  chanceBingoNaExtra: number;
+  /** Pesos do teto da rodada comum por conjunto de padrões. */
+  pesos: Record<PatternSetName, PesosTeto>;
+  taxaQuaseBingo: number;
+  /** Chance de uma oferta de bola extra ser grátis. */
+  chanceGratis: number;
+  missSemPremio: number;
+  hitComPremio: number;
+  missComPremio: number;
+  /** Fator do custo da bola extra (para o 7º parâmetro de RoundSession). */
+  costFactor: number;
+}
+
+/** Traduz os presets do painel em números. Pura: o mesmo RuntimeTuning dá sempre o mesmo resultado. */
+export function resolveTuning(t: RuntimeTuning): ResolvedTuning {
+  const P = DIRECTOR_PARAMS;
+  const k = EXTRA_PRESETS[t.ofertaExtra] ?? 1;
+  const b = BINGO_PRESETS[t.bingosPorMes] ?? BINGO_PRESETS['2-3'];
+  return {
+    ...b,
+    chanceBingoNaExtra: TUNING.chanceBingoNaExtra,
+    pesos: PREMIOS_PRESETS[t.premiosDoDia] ?? PREMIOS_PRESETS.normal,
+    taxaQuaseBingo: P.taxaQuaseBingo,
+    chanceGratis: GRATIS_PRESETS[t.chanceGratis] ?? P.chanceGratis,
+    missSemPremio: Math.min(0.9, P.missSemPremio * k),
+    hitComPremio: Math.min(0.9, P.hitComPremio * k),
+    missComPremio: Math.min(0.9, P.missComPremio * k),
+    costFactor: COST_FACTOR[t.custoExtra] ?? COST_FACTOR.normal,
+  };
+}
+
+const DEFAULT_RESOLVED: ResolvedTuning = resolveTuning(DEFAULT_TUNING);
 
 // ---------------------------------------------------------------------------
 // Estado
@@ -100,19 +145,19 @@ export function estimarRitmo(director: DirectorState, now: number): number {
 }
 
 /** Chance de bingo NA PRÓXIMA rodada (0 se proibido). Exportada para testes/simulador. */
-export function bingoChance(director: DirectorState, now: number): number {
+export function bingoChance(director: DirectorState, now: number, T: ResolvedTuning = DEFAULT_RESOLVED): number {
   const P = DIRECTOR_PARAMS;
   const noMes = director.bingosPorMes[monthKey(now)] ?? 0;
-  if (noMes >= TUNING.bingoMaxPorMes) return 0;
+  if (noMes >= T.bingoMaxPorMes) return 0;
   const d = diasDesdeUltimoBingo(director, now);
-  if (d < TUNING.diasMinEntreBingos) return 0;
+  if (d < T.diasMinEntreBingos) return 0;
 
   const ritmo = estimarRitmo(director, now);
   let hazard: number;
-  if (d <= TUNING.diasAlvoEntreBingos) {
-    hazard = lerp(P.hazardMin, P.hazardAlvo, (d - TUNING.diasMinEntreBingos) / (TUNING.diasAlvoEntreBingos - TUNING.diasMinEntreBingos));
+  if (d <= T.diasAlvoEntreBingos) {
+    hazard = lerp(P.hazardMin, P.hazardAlvo, (d - T.diasMinEntreBingos) / (T.diasAlvoEntreBingos - T.diasMinEntreBingos));
   } else {
-    hazard = lerp(P.hazardAlvo, P.hazardForcar, (d - TUNING.diasAlvoEntreBingos) / (TUNING.diasForcarBingo - TUNING.diasAlvoEntreBingos));
+    hazard = lerp(P.hazardAlvo, P.hazardForcar, (d - T.diasAlvoEntreBingos) / (T.diasForcarBingo - T.diasAlvoEntreBingos));
   }
   // Reforço para meses com poucos bingos (mês corrente pode ser parcial; só atua perto do fim).
   if (P.pressaoMes) {
@@ -121,8 +166,8 @@ export function bingoChance(director: DirectorState, now: number): number {
     else if (noMes === 1 && restam < 8) hazard = Math.max(hazard, lerp(0.2, 0.7, (8 - restam) / 8));
   }
   let p = 1 - Math.pow(1 - Math.min(0.995, hazard), 1 / ritmo);
-  if (d >= TUNING.diasForcarBingo) {
-    const rodadasApos = (d - TUNING.diasForcarBingo) * ritmo;
+  if (d >= T.diasForcarBingo) {
+    const rodadasApos = (d - T.diasForcarBingo) * ritmo;
     p = Math.max(p, Math.min(1, 0.05 + rodadasApos / P.rodadasParaForcar));
   }
   return Math.min(1, Math.max(0, p));
@@ -137,15 +182,15 @@ function tiers(): (PatternId | null)[] {
   return [null, ...tiersBelowBingo()];
 }
 
-function tierWeights(): number[] {
-  const w = DIRECTOR_PARAMS.pesos[getPatternSet()] ?? {};
+function tierWeights(T: ResolvedTuning): number[] {
+  const w = T.pesos[getPatternSet()] ?? {};
   const t = tiers();
   return t.map((p) => (p === null ? w.nada ?? 0.6 : w[p] ?? 0));
 }
 
 /** Sorteia quais ofertas de bola extra são grátis (uma flag por bola extra do plano). */
-export function rollFree(count: number, rng: Rng): boolean[] {
-  return Array.from({ length: count }, () => rng() < DIRECTOR_PARAMS.chanceGratis);
+export function rollFree(count: number, rng: Rng, chance: number = DEFAULT_RESOLVED.chanceGratis): boolean[] {
+  return Array.from({ length: count }, () => rng() < chance);
 }
 
 function activeIdx(active: boolean[]): number[] {
@@ -164,8 +209,9 @@ function otherCaps(
   maxLevel: number,
   chance: number,
   rng: Rng,
+  T: ResolvedTuning,
 ): void {
-  const w = tierWeights();
+  const w = tierWeights(T);
   const t = tiers();
   for (const j of idx) {
     if (j === focus || rng() >= chance) continue;
@@ -182,6 +228,7 @@ export function sampleTarget(
   active: boolean[],
   wantBingo: boolean,
   rng: Rng,
+  T: ResolvedTuning = DEFAULT_RESOLVED,
 ): DrawTarget {
   const P = DIRECTOR_PARAMS;
   const idx = activeIdx(active);
@@ -192,27 +239,27 @@ export function sampleTarget(
   if (wantBingo) {
     caps[focus] = 'bingo';
     // nas rodadas de bingo, as demais cartelas ganham no máximo algo bem pequeno
-    otherCaps(caps, focus, idx, small(), 0.15, rng);
+    otherCaps(caps, focus, idx, small(), 0.15, rng, T);
     return {
       maxPattern: caps,
-      bingo: { at: rng() < TUNING.chanceBingoNaExtra ? 'extra' : 'main' },
+      bingo: { at: rng() < T.chanceBingoNaExtra ? 'extra' : 'main' },
       focus,
     };
   }
-  if (rng() < P.taxaQuaseBingo) {
-    otherCaps(caps, focus, idx, small(), 0.15, rng);
+  if (rng() < T.taxaQuaseBingo) {
+    otherCaps(caps, focus, idx, small(), 0.15, rng, T);
     return { maxPattern: caps, almost: true, focus };
   }
 
   const t = tiers();
-  const tier = weightedIndex(tierWeights(), rng);
+  const tier = weightedIndex(tierWeights(T), rng);
   caps[focus] = t[tier];
-  otherCaps(caps, focus, idx, tier, P.chanceOutraCartela, rng);
+  otherCaps(caps, focus, idx, tier, P.chanceOutraCartela, rng, T);
   let extra: ExtraMode;
   const r = rng();
-  if (tier === 0) extra = r < P.missSemPremio ? 'miss' : 'none';
-  else if (r < P.hitComPremio) extra = 'hit';
-  else if (r < P.hitComPremio + P.missComPremio && tier < t.length - 1) extra = 'miss'; // 'miss' em padrão alto vira quase-bingo caro
+  if (tier === 0) extra = r < T.missSemPremio ? 'miss' : 'none';
+  else if (r < T.hitComPremio) extra = 'hit';
+  else if (r < T.hitComPremio + T.missComPremio && tier < t.length - 1) extra = 'miss'; // 'miss' em padrão alto vira quase-bingo caro
   else extra = 'none';
   return { maxPattern: caps, extra, focus };
 }
@@ -224,13 +271,16 @@ export interface PlanRoundInput {
   now: number;
   director: DirectorState;
   rng: Rng;
+  /** Ajustes do painel (padrão: DEFAULT_TUNING). Vale só para esta rodada. */
+  tuning?: RuntimeTuning;
 }
 
 export function planRound(input: PlanRoundInput): { plan: DrawPlan; intendedBingo: boolean } {
   const { cards, active, now, director, rng } = input;
-  const wantBingo = rng() < bingoChance(director, now);
-  const target = sampleTarget(active, wantBingo, rng);
+  const T = input.tuning ? resolveTuning(input.tuning) : DEFAULT_RESOLVED;
+  const wantBingo = rng() < bingoChance(director, now, T);
+  const target = sampleTarget(active, wantBingo, rng, T);
   const built = buildPlanDetailed(cards, active, target, rng);
-  const plan: DrawPlan = { ...built.plan, free: rollFree(built.plan.extras.length, rng) };
+  const plan: DrawPlan = { ...built.plan, free: rollFree(built.plan.extras.length, rng, T.chanceGratis) };
   return { plan, intendedBingo: !!built.target.bingo && built.validated };
 }
