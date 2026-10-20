@@ -18,7 +18,20 @@ try {
 }
 
 audio.onCaption(setSpokenCaption);
-bus.on('stateChanged', () => ui.render());
+// Modo leve/econômico também deixa o áudio mais leve (música em taxa menor).
+let lastLight: boolean | null = null;
+function syncEconomy(): void {
+  const light = game.getView().settings.light;
+  if (light !== lastLight) {
+    lastLight = light;
+    audio.setEconomy(light);
+  }
+}
+syncEconomy();
+bus.on('stateChanged', () => {
+  syncEconomy();
+  ui.render();
+});
 ui.render();
 
 // Mantém a tela acesa durante a partida (silencioso se não houver suporte).

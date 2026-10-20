@@ -17,7 +17,7 @@ const VIEWPORTS = (
   .split(',')
   .map((s) => { const [w, h] = s.split('x').map(Number); return { w, h }; });
 const ALL = [
-  'idle', 'mail-arrived', 'mail-open', 'drawing', 'drawing-turbo', 'extra', 'extra-free', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'daily',
+  'splash', 'idle', 'mail-arrived', 'mail-open', 'drawing', 'drawing-turbo', 'extra', 'extra-free', 'bingo', 'bingo-cards', 'line', 'line-cards', 'gift', 'daily',
   'prizes', 'prizes-variado', 'settings', 'settings-jogo', 'settings-tela', 'pin', 'admin', 'admin-jogo', 'admin-jogo-2', 'admin-jogo-3', 'admin-jogo-4', 'admin-jogo-5', 'admin-resumo-2', 'admin-resumo-3', 'admin-resumo-4',
   'admin-pin', 'admin-pin-2', 'admin-pin-3', 'admin-aparelho', 'admin-aparelho-2', 'admin-aparelho-3', 'admin-aparelho-4', 'settings-admin', 'idle-variado', 'idle-big', 'extra-big', 'drawing-big',
 ];

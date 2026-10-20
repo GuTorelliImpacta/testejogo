@@ -24,9 +24,9 @@ export function layer(cls = '', label = ''): Layer {
 
 export function focusFirst(root: HTMLElement): void {
   const f = root.querySelector<HTMLElement>('button:not(:disabled)');
-  if (f) queueMicrotask(() => f.focus({ preventScroll: true }));
+  if (f) void Promise.resolve().then(() => f.focus({ preventScroll: true }));
 }
 export function focusDlg(root: HTMLElement): void {
   root.setAttribute('tabindex', '-1');
-  queueMicrotask(() => root.focus({ preventScroll: true }));
+  void Promise.resolve().then(() => root.focus({ preventScroll: true }));
 }

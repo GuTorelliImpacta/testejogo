@@ -115,6 +115,8 @@ export function createControls(hd: Handlers): Controls {
     creditsVal,
     update(v) {
       setText(jackVal, fmt(v.jackpot));
+      setCls(cred, 'vl', fmt(v.credits).length >= 9); // 7 digitos: fonte menor em tela estreita
+      setCls(jack, 'vl', fmt(v.jackpot).length >= 9);
       const muted = v.settings.muted;
       if (soundMuted !== muted) {
         soundMuted = muted;

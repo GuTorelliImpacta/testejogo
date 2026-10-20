@@ -15,6 +15,11 @@
   grid-gap: var(--gap);
   gap: var(--gap);
   padding: var(--pad);
+  /* iPhone com entalhe: respeita as areas seguras (aparelho sem env() ignora estas linhas) */
+  padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px));
+  padding-right: calc(var(--pad) + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--pad) + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(var(--pad) + env(safe-area-inset-left, 0px));
   font-family: var(--font);
   font-size: var(--fs);
   line-height: 1.15;
@@ -103,7 +108,7 @@
 /* ---------- celular em pe (retrato estreito) ---------- */
 @media (orientation: portrait) and (max-width: 599px) {
   .altina {
-    --gap: 8px; --pad: 8px;
+    --gap: 6px; --pad: 8px;
     --cellfs: 20px;
     grid-template-columns: 64px minmax(0, 1fr) 64px 64px;
     grid-column-gap: 12px; column-gap: 12px;
@@ -117,6 +122,7 @@
       "bar bar bar bar";
   }
   .altina .top { display: contents; }
+  .altina .top > * + * { margin-left: 0; }
   .altina .top .sp { display: none; }
   .altina .top .logo { grid-area: logo; }
   .altina .top .cred { grid-area: cred; }

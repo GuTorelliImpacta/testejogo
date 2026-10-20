@@ -67,7 +67,7 @@ const gear = async (p: Page) => { await p.locator('.top .gear').click(); await p
 const pin = async (p: Page) => { for (let i = 0; i < 5; i++) await p.locator('.top .logo').click(); await p.waitForTimeout(350); };
 const keys = async (p: Page, root: string, ks: string) => { for (const k of ks) await p.locator(`${root} .keys button`, { hasText: new RegExp(`^${k}$`) }).click(); await p.waitForTimeout(300); };
 const login = async (p: Page) => { await ent(p); await pin(p); await keys(p, '.pindlg', '1958'); await p.waitForTimeout(300); };
-const tab = async (p: Page, t: string, page = 1) => { await p.locator(`.adm .tab[data-tab="${t}"]`).click(); await p.waitForTimeout(250); for (let i = 1; i < page; i++) await p.locator(`.adm .p-${t} .pgb`).nth(1).click(); await p.waitForTimeout(250); };
+const tab = async (p: Page, t: string, page = 1) => { await p.locator(`.adm .tab[data-tab="${t}"]`).click(); await p.waitForTimeout(250); for (let i = 1; i < page; i++) { const nx = p.locator(`.adm .p-${t} .pgb`).nth(1); if (await nx.isVisible()) await nx.click(); } await p.waitForTimeout(250); };
 const settingsTela = async (p: Page) => { await ent(p); await gear(p); await p.locator('.tabs .tab').nth(2).click(); await p.waitForTimeout(300); };
 const ent = async (p: Page, ms = 400) => { await p.getByText('ENTRAR').click(); await p.waitForTimeout(ms); };
 

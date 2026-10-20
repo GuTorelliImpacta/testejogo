@@ -37,7 +37,7 @@ export function createExtraPanel(api: GameApi): ExtraPanel {
       const k = `${ex.cost}|${ex.free}|${ex.remaining}`;
       if (k !== key) {
         key = k;
-        queueMicrotask(() => buy.focus({ preventScroll: true }));
+        void Promise.resolve().then(() => buy.focus({ preventScroll: true }));
       }
       return true;
     },

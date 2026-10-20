@@ -228,17 +228,19 @@ export function createAdmin(api: GameApi, onClose: () => void): Admin {
 
   // ======== PIN (trocar) ========
   const pinPane = h('div', 'pinp');
-  const pinTitle = h('div', 'pint', U.pinOld);
+  const pinTitle = h('div', 'pint', U.pinOld, { 'aria-live': 'polite' });
   const pinDots = makeDots();
-  const pinMsg = h('div', 'amsg', U.pinHint, { 'aria-live': 'polite' });
   let step: 'old' | 'new' | 'again' = 'old';
   let cur = '';
   let oldPin = '';
   let newPin = '';
   const stepTitle = () => (step === 'old' ? U.pinOld : step === 'new' ? U.pinNew : U.pinAgain);
+  /** O resultado aparece no lugar do titulo ate o proximo toque (menos uma linha na tela). */
+  const say1 = (t: string) => { pinTitle.textContent = t; pinTitle.classList.add('res'); };
   const pinKeyboard = makeKeypad(
     (k) => {
       if (cur.length >= 4) return;
+      if (pinTitle.classList.contains('res')) { pinTitle.classList.remove('res'); pinTitle.textContent = stepTitle(); }
       cur += k;
       pinDots.set(cur.length);
       if (cur.length < 4) return;
@@ -248,22 +250,24 @@ export function createAdmin(api: GameApi, onClose: () => void): Admin {
       if (step === 'old') {
         oldPin = done;
         step = 'new';
-        pinMsg.textContent = U.pinHint;
       } else if (step === 'new') {
         newPin = done;
         step = 'again';
-        pinMsg.textContent = U.pinHint;
       } else {
         if (done !== newPin) {
-          pinMsg.textContent = U.pinMismatch;
           step = 'new';
           newPin = '';
+          pinTitle.textContent = stepTitle();
+          say1(U.pinMismatch);
+          return;
         } else {
           const ok = api.admin.changePin(oldPin, newPin);
-          pinMsg.textContent = ok ? U.pinChanged : U.pinOldWrong;
           step = 'old';
           oldPin = '';
           newPin = '';
+          pinTitle.textContent = stepTitle();
+          say1(ok ? U.pinChanged : U.pinOldWrong);
+          return;
         }
       }
       pinTitle.textContent = stepTitle();
@@ -274,7 +278,7 @@ export function createAdmin(api: GameApi, onClose: () => void): Admin {
     },
   );
   const pinLeft = h('div', 'pinl');
-  pinLeft.append(pinTitle, pinDots.el, pinMsg);
+  pinLeft.append(pinTitle, pinDots.el);
   pinPane.append(pinLeft, pinKeyboard);
   const pinTab = mkPane('p-pin', [pinPane], true);
   const resetPin = () => {
@@ -284,7 +288,7 @@ export function createAdmin(api: GameApi, onClose: () => void): Admin {
     newPin = '';
     pinDots.set(0);
     pinTitle.textContent = stepTitle();
-    pinMsg.textContent = U.pinHint;
+    pinTitle.classList.remove('res');
   };
 
   // ======== APARELHO ========

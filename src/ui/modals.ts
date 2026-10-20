@@ -274,7 +274,10 @@ export function createModals(api: GameApi, onLocalChange: () => void): Modals {
 
   // Esc fecha modais locais
   const onKey = (ev: KeyboardEvent) => {
-    if (ev.key === 'Escape' && local) setLocal(null);
+    if (ev.key === 'Escape' && local) {
+      if (local === 'admin') api.admin.lock();
+      setLocal(null);
+    }
   };
   document.addEventListener('keydown', onKey);
   cleanups.push(() => document.removeEventListener('keydown', onKey));
